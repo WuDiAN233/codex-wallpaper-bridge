@@ -1,12 +1,12 @@
 (function installPicker(token,bridgePid) {
   const existing=document.getElementById('codex-wallpaper-picker');
-  if(existing?._bridgeToken===token&&existing?._uiVersion===17) return;
+  if(existing?._bridgeToken===token&&existing?._uiVersion===18) return;
   existing?._dispose?.();
   existing?.remove();
   const host=document.createElement('div'); host.id='codex-wallpaper-picker';
   host._bridgeToken=token;
   host._bridgePid=bridgePid;
-  host._uiVersion=17;
+  host._uiVersion=18;
   const events=new AbortController();host._dispose=()=>events.abort();
   host.style.cssText='position:fixed;right:20px;bottom:94px;z-index:2147483000;font-family:inherit;';
   const shadow=host.attachShadow({mode:'open'});
@@ -23,7 +23,7 @@
   <div class="sub">自动识别 Wallpaper Engine 图库与新增壁纸，主题色跟随画面。所有壁纸应用为静态图片；场景和视频仅在选择时取景，完成后停止后台渲染。</div>
   <div class="row" style="margin-top:16px"><input class="grow" id="search" type="search" placeholder="搜索壁纸" aria-label="搜索壁纸"><select id="filter" aria-label="壁纸类型"><option value="all">全部壁纸</option><option value="supported">可用壁纸</option><option value="scene">场景静帧</option><option value="web">网页壁纸</option><option value="video">视频</option><option value="image">图片</option></select></div>
   <div class="row"><div id="library-info" class="sub grow">正在检查图库…</div><button id="official-font">默认字体</button><button id="choose-library">选择图库目录</button></div><div id="count" class="sub"></div><div id="grid"></div><div id="selection" hidden><img id="preview" class="preview" alt="所选壁纸预览"><div id="selected-name" class="sub"></div></div>
-  <div class="footer"><div class="row"><label for="glass">消息框</label><select id="glass" aria-label="消息框效果"><option value="solid">实色 · 更省资源</option><option value="light">轻度毛玻璃</option></select></div><div class="row"><label for="reveal">背景可见度</label><input id="reveal" type="range" min="0" max="100" value="65"><output id="percent">65%</output></div><div class="row"><button id="apply" disabled>应用静态壁纸</button><button id="retake" disabled title="重新获取所选场景或视频的画面">重新取景</button><button id="opacity">调整当前背景</button><span class="grow"></span><button id="restore">恢复原生外观</button></div><div id="status" role="status"></div></div></section>`;
+  <div class="footer"><div class="row"><label for="glass">消息框</label><select id="glass" aria-label="消息框效果"><option value="solid">实色 · 更省资源</option><option value="light">毛玻璃</option></select></div><div class="row" id="blur-row"><label for="blur">模糊程度</label><input id="blur" type="range" min="0" max="20" step="1" value="6" style="flex:1;min-width:0;accent-color:var(--ds-accent,#339cff)"><output id="blur-value" for="blur">6</output></div><div class="row"><label for="reveal">背景可见度</label><input id="reveal" type="range" min="0" max="100" value="65"><output id="percent">65%</output></div><div class="row"><button id="apply" disabled>应用静态壁纸</button><button id="retake" disabled title="重新获取所选场景或视频的画面">重新取景</button><button id="opacity">调整当前背景</button><span class="grow"></span><button id="restore">恢复原生外观</button></div><div id="status" role="status"></div></div></section>`;
   document.body.append(host);
   let brightness=document.getElementById('codex-wallpaper-brightness');
   if(!brightness){brightness=document.createElement('style');brightness.id='codex-wallpaper-brightness';document.head.append(brightness)}
@@ -59,7 +59,7 @@
       .thread-scroll-container [data-local-conversation-final-assistant],
       .thread-scroll-container [data-response-annotation-conversation][data-response-annotation-target]:not([data-local-conversation-final-assistant] *),
       .thread-scroll-container [data-markdown-text-style]:not([data-response-annotation-conversation] *):not([data-local-conversation-final-assistant] *)
-    ){background:rgb(var(--ds-panel-rgb) / .84)!important;backdrop-filter:blur(6px)!important;-webkit-backdrop-filter:blur(6px)!important}
+    ){background:rgb(var(--ds-panel-rgb) / .84)!important;backdrop-filter:blur(var(--wallpaper-glass-blur,6px))!important;-webkit-backdrop-filter:blur(var(--wallpaper-glass-blur,6px))!important}
     html[data-dream-skin="active"][data-wallpaper-glass="light"][data-wallpaper-scrolling]:has(#codex-wallpaper-picker) [data-user-message-bubble]{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
   `;
   function installScrollGlass(doc,signal){
@@ -91,7 +91,15 @@
   host._dispose=()=>{events.abort();stopScrollGlass();releaseThumbnails()};
   const glassKey='codex-wallpaper-bridge:message-glass';
   try{$('glass').value=localStorage.getItem(glassKey)==='light'?'light':'solid'}catch{$('glass').value='solid'}
-  const applyGlass=()=>document.documentElement.setAttribute('data-wallpaper-glass',$('glass').value);
+  const blurKey='codex-wallpaper-bridge:glass-blur';
+  let savedBlur=6;
+  try{const raw=localStorage.getItem(blurKey),n=Number(raw);if(raw!==null&&raw.trim()!==''&&Number.isInteger(n)&&n>=0&&n<=20)savedBlur=n}catch{}
+  $('blur').value=String(savedBlur);
+  const applyBlur=()=>{const value=Number($('blur').value);document.documentElement.style.setProperty('--wallpaper-glass-blur',value+'px');$('blur-value').textContent=String(value);$('blur').setAttribute('aria-valuetext',value===0?'无模糊':value+' 像素')};
+  applyBlur();
+  $('blur').oninput=applyBlur;
+  $('blur').onchange=()=>{applyBlur();try{localStorage.setItem(blurKey,$('blur').value)}catch{$('status').textContent='模糊程度已生效，但保存失败；重启后需重新选择。'}};
+  const applyGlass=()=>{document.documentElement.setAttribute('data-wallpaper-glass',$('glass').value);$('blur-row').hidden=$('glass').value!=='light'};
   applyGlass();
   $('glass').onchange=()=>{applyGlass();try{localStorage.setItem(glassKey,$('glass').value)}catch{$('status').textContent='当前效果已生效，但保存失败；重启后需重新选择。'}};
 
