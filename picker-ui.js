@@ -1,12 +1,12 @@
 (function installPicker(token,bridgePid) {
   const existing=document.getElementById('codex-wallpaper-picker');
-  if(existing?._bridgeToken===token&&existing?._uiVersion===16) return;
+  if(existing?._bridgeToken===token&&existing?._uiVersion===17) return;
   existing?._dispose?.();
   existing?.remove();
   const host=document.createElement('div'); host.id='codex-wallpaper-picker';
   host._bridgeToken=token;
   host._bridgePid=bridgePid;
-  host._uiVersion=16;
+  host._uiVersion=17;
   const events=new AbortController();host._dispose=()=>events.abort();
   host.style.cssText='position:fixed;right:20px;bottom:94px;z-index:2147483000;font-family:inherit;';
   const shadow=host.attachShadow({mode:'open'});
@@ -28,6 +28,15 @@
   let brightness=document.getElementById('codex-wallpaper-brightness');
   if(!brightness){brightness=document.createElement('style');brightness.id='codex-wallpaper-brightness';document.head.append(brightness)}
   brightness.textContent=`
+    /* Opaque local backing keeps toolbar icons readable on any wallpaper.
+       Scope to shell controls; never recolor message actions or native chrome. */
+    html[data-dream-skin="active"]:has(#codex-wallpaper-picker) :is([data-app-shell-header-toolbar],[data-app-shell-header-slot-content]) button.button-toolbar{
+      color:#f5f7fa!important;background:#26333e!important;border:1px solid #8b9aa8!important;
+      min-width:32px;min-height:32px;border-radius:8px;box-shadow:0 1px 3px #0005!important;
+      backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
+    }
+    html[data-dream-skin="active"]:has(#codex-wallpaper-picker) :is([data-app-shell-header-toolbar],[data-app-shell-header-slot-content]) button.button-toolbar:is(:hover,[data-state="open"],[aria-pressed="true"]):not(:disabled):not([aria-disabled="true"]){background:#3c5060!important;border-color:#e5edf4!important}
+    html[data-dream-skin="active"]:has(#codex-wallpaper-picker) :is([data-app-shell-header-toolbar],[data-app-shell-header-slot-content]) button.button-toolbar:focus-visible{outline:2px solid #ffffff!important;outline-offset:2px;box-shadow:0 0 0 4px #17212b!important}
     html[data-dream-skin="active"]:has(#codex-wallpaper-picker) main[class*="_MainContentSurface_"]{background:rgb(var(--ds-bg-rgb) / calc((1 - var(--dream-wallpaper-reveal,1)) * .7))!important}
     html[data-dream-skin="active"]:has(#codex-wallpaper-picker) main[class*="_MainContentSurface_"]::before,
     html[data-dream-skin="active"]:has(#codex-wallpaper-picker) main[class*="_MainContentSurface_"]::after{opacity:calc(1 - var(--dream-wallpaper-reveal,1))!important}
