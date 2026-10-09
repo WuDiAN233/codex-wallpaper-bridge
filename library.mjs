@@ -35,11 +35,11 @@ export async function findEngine(config,detected={}){
 }
 export async function scanLibrary(config,cache=null,detected=null){const system=detected??(config.autoDiscover?await systemPaths():{});const roots=await discoverRoots(config,system);return {...await catalog(roots,{native:!!config.nativeRendering,cache,inlinePreview:false}),roots,enginePath:await findEngine(config,system)}}
 export class LibraryMonitor{
-  constructor(scan,onChange,intervalMs=5000){this.scan=scan;this.onChange=onChange;this.intervalMs=intervalMs;this.current=null;this.signature='';this.pending=null;this.nextScan=0}
+  constructor(scan,onChange,intervalMs=5000){this.scan=scan;this.onChange=onChange;this.intervalMs=intervalMs;this.current=null;this.signature='';this.pending=null;this.lastScan=-Infinity}
   async refresh(force=false){
     if(this.pending)return this.pending;
-    if(!force&&Date.now()<this.nextScan)return this.current;
-    this.pending=(async()=>{const next=await this.scan();const signature=librarySignature(next);const changed=signature!==this.signature;this.current=next;this.signature=signature;this.nextScan=Date.now()+this.intervalMs;if(changed)await this.onChange(next);return next})();
+    if(!force&&Date.now()-this.lastScan<this.intervalMs)return this.current;
+    this.pending=(async()=>{const next=await this.scan();const signature=librarySignature(next);const changed=signature!==this.signature;this.current=next;this.signature=signature;this.lastScan=Date.now();if(changed)await this.onChange(next);return next})();
     try{return await this.pending}finally{this.pending=null}
   }
 }

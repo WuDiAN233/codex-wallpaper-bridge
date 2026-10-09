@@ -4,6 +4,7 @@ export function catalogUpdate(previousRevision,items,libraryInfo,message){
   if(!previousRevision||previousRevision!==libraryInfo.revision)result.items=items();
   return result;
 }
+export function libraryPollInterval(panelOpen,configured=5000){return panelOpen?configured:Math.max(configured,30000)}
 export function isWallpaperPage(target){
   if(target.type!=='page')return false;
   try{

@@ -15,7 +15,7 @@
 
 自动读取 Steam 注册表位置、`libraryfolders.vdf`、Wallpaper Engine 安装信息和正在运行的进程位置，扫描所有已发现的 Steam 库及默认/自建壁纸目录，不固定 C: 或 D:。
 
-“选择图库目录”接受 Steam 库根目录、包含 `wallpaper64.exe` / `wallpaper32.exe` 的安装目录、包含多个壁纸项目的文件夹，或单个含 `project.json` 的项目。也可复制 `config.example.json` 为 `config.json` 后填入本机绝对路径。重复目录会去重，新增壁纸通常在下载完成后约 5–10 秒出现。
+“选择图库目录”接受 Steam 库根目录、包含 `wallpaper64.exe` / `wallpaper32.exe` 的安装目录、包含多个壁纸项目的文件夹，或单个含 `project.json` 的项目。也可复制 `config.example.json` 为 `config.json` 后填入本机绝对路径。重复目录会去重，打开图库会立即刷新；浏览时新增壁纸通常在下载完成后约 5–10 秒出现，面板关闭或应用不可见时约 30 秒检查一次，减少后台文件扫描。更长的自定义刷新间隔仍被保留。
 
 ## 使用
 

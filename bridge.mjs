@@ -11,7 +11,7 @@ import {FileCache} from './file-cache.mjs';
 import {readConfig,addLocation,saveConfig} from './configuration.mjs';
 import {Thumbnails} from './thumbnails.mjs';
 import {SnapshotCache,snapshotKey} from './snapshot-cache.mjs';
-import {catalogUpdate,isWallpaperPage} from './catalog-delivery.mjs';
+import {catalogUpdate,isWallpaperPage,libraryPollInterval} from './catalog-delivery.mjs';
 import {backupTheme} from './theme-backup.mjs';
 import {verifyStatic} from './verify-static.mjs';
 import {PreparedThemeAction} from './theme-worker.mjs';
@@ -227,17 +227,20 @@ async function handle(session,event){
 let lastStatus='',lastStatusAt=0;
 async function attach(){
   await identity();
-  await monitor.refresh();
   const targets=await get('/json/list');
+  let libraryPanelOpen=false;
   for(const target of targets){
     if(!isWallpaperPage(target)||!/^[A-Za-z0-9._-]{1,200}$/.test(target.id))continue;
     let session=sessions.get(target.id);
     if(!session){session=new Session(target);sessions.set(target.id,session);await session.send('Runtime.enable');await session.send('Runtime.addBinding',{name:'codexWallpaperAction'});}
-    const page=await session.evaluate(`({valid:location.protocol==='app:' && !!document.querySelector('main,aside.app-shell-left-panel,[data-testid="composer"]'),installed:document.getElementById('codex-wallpaper-picker')?._bridgePid===${process.pid},native:{id:window.__CODEX_WALLPAPER_NATIVE__?.id,handle:window.__CODEX_WALLPAPER_NATIVE__?.handle,failed:window.__CODEX_WALLPAPER_NATIVE__?.failed===true}})`);
+    const page=await session.evaluate(`({panelOpen:document.visibilityState==='visible' && document.getElementById('codex-wallpaper-picker')?.shadowRoot?.getElementById('panel')?.hidden===false,valid:location.protocol==='app:' && !!document.querySelector('main,aside.app-shell-left-panel,[data-testid="composer"]'),installed:document.getElementById('codex-wallpaper-picker')?._bridgePid===${process.pid},native:{id:window.__CODEX_WALLPAPER_NATIVE__?.id,handle:window.__CODEX_WALLPAPER_NATIVE__?.handle,failed:window.__CODEX_WALLPAPER_NATIVE__?.failed===true}})`);
+    libraryPanelOpen ||= page.panelOpen;
     if(page.valid){
       if(!page.installed){await session.evaluate(clearNativeExpression);await session.evaluate(uiExpression)}
     }
   }
+  monitor.intervalMs=libraryPollInterval(libraryPanelOpen,config.refreshIntervalMs||5000);
+  await monitor.refresh();
   const liveIds=new Set(targets.filter(isWallpaperPage).map(target=>target.id));
   for(const [id,session] of sessions)if(!liveIds.has(id)){session.ws.close();sessions.delete(id)}
   const status={phase:'Running',pid:process.pid,targets:sessions.size,...libraryInfo(),nativeWallpaper:nativeRenderer.record?.name||null};

@@ -43,3 +43,11 @@ test('Wallpaper Engine type labels are case-insensitive',()=>fixture(async root=
  await project(root,'Scene project','Scene');await project(root,'Video project','Video','movie.mp4');
  const items=(await catalog([root],{native:true})).items;assert.equal(items.length,2);assert.ok(items.every(x=>x.supported));assert.deepEqual(new Set(items.map(x=>x.type)),new Set(['scene','video']));
 }));
+
+test('opening the library shortens an already scheduled idle interval',async t=>{
+ let now=100000,scans=0;t.mock.method(Date,'now',()=>now);
+ const monitor=new LibraryMonitor(async()=>{scans++;return {items:[],problems:[],roots:[]}},()=>{},30000);
+ await monitor.refresh();now+=6000;await monitor.refresh();assert.equal(scans,1);
+ monitor.intervalMs=5000;await monitor.refresh();assert.equal(scans,2);
+ await monitor.refresh();assert.equal(scans,2);await monitor.refresh(true);assert.equal(scans,3);
+});
