@@ -11,6 +11,8 @@ import {FileCache} from './file-cache.mjs';
 import {readConfig,addLocation,saveConfig} from './configuration.mjs';
 import {Thumbnails} from './thumbnails.mjs';
 import {SnapshotCache,snapshotKey} from './snapshot-cache.mjs';
+import {catalogUpdate,isWallpaperPage} from './catalog-delivery.mjs';
+import {backupTheme} from './theme-backup.mjs';
 import {NativeRenderer,prepareNativeExpression,clearNativeExpression,discardNativeExpression} from './native-media.mjs';
 const here=path.dirname(fileURLToPath(import.meta.url));
 const stateRoot=path.join(process.env.LOCALAPPDATA,'CodexDreamSkin');
@@ -59,7 +61,7 @@ try{await nativeRenderer.recover(library.items,{open:false});await nativeRendere
 const monitor=new LibraryMonitor(async()=>{const next=await scanLibrary(await readConfig(here),fileCache);await thumbnails.fill(next.items);return next},async next=>{
   library=next;
   nativeRenderer.enginePath=next.enginePath;
-  for(const session of sessions.values())await reply(session,{items:publicItems(),libraryInfo:libraryInfo()}).catch(e=>console.error('图库刷新通知失败：'+e.message));
+  for(const session of sessions.values())await reply(session,catalogUpdate(null,publicItems,libraryInfo())).catch(e=>console.error('图库刷新通知失败：'+e.message));
 },config.refreshIntervalMs||5000);
 monitor.current=library;monitor.signature=librarySignature(library);
 const ui=await fs.readFile(path.join(here,'picker-ui.js'),'utf8');
@@ -80,12 +82,13 @@ async function handle(session,event){
   if(typeof event.payload!=='string'||event.payload.length>1024)return;
   let request;try{request=JSON.parse(event.payload)}catch{return}
   if(request.token!==token||!['list','apply','opacity','restore','choose-library','official-font'].includes(request.op))return;
-  const allowed=new Set(['token','op','id','reveal','retake']);if(Object.keys(request).some(key=>!allowed.has(key)))return;
+  const allowed=new Set(['token','op','id','reveal','retake','revision']);if(Object.keys(request).some(key=>!allowed.has(key)))return;
+  if(request.revision!=null&&(request.op!=='list'||typeof request.revision!=='string'||!/^[a-f0-9]{64}$/.test(request.revision)))return;
   if(request.retake!==undefined&&(typeof request.retake!=='boolean'||request.op!=='apply'))return;
   const probe=await session.evaluate(`location.protocol==='app:' && !!document.querySelector('main,aside.app-shell-left-panel,[data-testid="composer"]')`);if(!probe)throw new Error('当前页面不是 Codex 工作区');
   if(request.op==='list'){
     // Show the last verified catalog immediately; publish changes after scanning.
-    await reply(session,{items:publicItems(),libraryInfo:libraryInfo(),message:nativeRecoveryError||`图库自动更新中。${library.problems.length?`${library.problems.length} 个目录尚未下载完整或无法读取。`:''}`});
+    await reply(session,catalogUpdate(request.revision,publicItems,libraryInfo(),nativeRecoveryError||`图库自动更新中。${library.problems.length?`${library.problems.length} 个目录尚未下载完整或无法读取。`:''}`));
     await monitor.refresh(true);return;
   }
   if(changing)throw new Error('上一项操作尚未结束，请稍候');
@@ -121,8 +124,7 @@ async function handle(session,event){
       const nativeBackup=path.join(here,'native-appearance-original.json');
       try {await fs.writeFile(nativeBackup,JSON.stringify(nativeBefore,null,2),{flag:'wx'})}catch(e){if(e.code!=='EEXIST')throw e}
       const validated=await safeFile(item.directory,path.relative(item.directory,item.file));
-      backup=path.join(here,'history',Date.now()+'-'+randomBytes(4).toString('hex'));
-      await fs.cp(path.join(stateRoot,'active-theme'),backup,{recursive:true,dereference:false});
+      backup=await backupTheme(path.join(stateRoot,'active-theme'),path.join(here,'history',Date.now()+'-'+randomBytes(4).toString('hex')));
       activeMediaPath=validated;
       if(item.mode==='native'||item.type==='video'){
         const key=await snapshotKey(item);
@@ -201,7 +203,7 @@ async function attach(){
   await monitor.refresh();
   const targets=await get('/json/list');
   for(const target of targets){
-    if(target.type!=='page'||!target.url?.startsWith('app://')||!/^[A-Za-z0-9._-]{1,200}$/.test(target.id))continue;
+    if(!isWallpaperPage(target)||!/^[A-Za-z0-9._-]{1,200}$/.test(target.id))continue;
     let session=sessions.get(target.id);
     if(!session){session=new Session(target);sessions.set(target.id,session);await session.send('Runtime.enable');await session.send('Runtime.addBinding',{name:'codexWallpaperAction'});}
     const page=await session.evaluate(`({valid:location.protocol==='app:' && !!document.querySelector('main,aside.app-shell-left-panel,[data-testid="composer"]'),installed:document.getElementById('codex-wallpaper-picker')?._bridgePid===${process.pid},native:{id:window.__CODEX_WALLPAPER_NATIVE__?.id,handle:window.__CODEX_WALLPAPER_NATIVE__?.handle,failed:window.__CODEX_WALLPAPER_NATIVE__?.failed===true}})`);
@@ -209,7 +211,7 @@ async function attach(){
       if(!page.installed){await session.evaluate(clearNativeExpression);await session.evaluate(uiExpression)}
     }
   }
-  const liveIds=new Set(targets.map(target=>target.id));
+  const liveIds=new Set(targets.filter(isWallpaperPage).map(target=>target.id));
   for(const [id,session] of sessions)if(!liveIds.has(id)){session.ws.close();sessions.delete(id)}
   const status={phase:'Running',pid:process.pid,targets:sessions.size,...libraryInfo(),nativeWallpaper:nativeRenderer.record?.name||null};
   const signature=JSON.stringify(status);

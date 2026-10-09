@@ -1,12 +1,12 @@
 (function installPicker(token,bridgePid) {
   const existing=document.getElementById('codex-wallpaper-picker');
-  if(existing?._bridgeToken===token&&existing?._uiVersion===12) return;
+  if(existing?._bridgeToken===token&&existing?._uiVersion===13) return;
   existing?._dispose?.();
   existing?.remove();
   const host=document.createElement('div'); host.id='codex-wallpaper-picker';
   host._bridgeToken=token;
   host._bridgePid=bridgePid;
-  host._uiVersion=12;
+  host._uiVersion=13;
   const events=new AbortController();host._dispose=()=>events.abort();
   host.style.cssText='position:fixed;right:20px;bottom:94px;z-index:2147483000;font-family:inherit;';
   const shadow=host.attachShadow({mode:'open'});
@@ -88,7 +88,7 @@
     $('grid').append(fragment);preview();controls();
     if(!visible.length){const message=document.createElement('p');message.className='sub';message.textContent='没有符合条件的壁纸。新壁纸下载完成后会自动出现在这里。';$('grid').append(message)}
   }
-  const close=()=>{$('panel').hidden=true;$('grid').replaceChildren();$('preview').removeAttribute('src')};$('toggle').onclick=()=>{if(!$('panel').hidden){close();return}$('panel').hidden=false;render();request('list')};$('dismiss').onclick=close;
+  const close=()=>{$('panel').hidden=true;$('grid').replaceChildren();$('preview').removeAttribute('src')};$('toggle').onclick=()=>{if(!$('panel').hidden){close();return}$('panel').hidden=false;render();request('list',{revision})};$('dismiss').onclick=close;
   document.addEventListener('pointerdown',event=>{
     if(!host.isConnected){events.abort();return}
     if(!$('panel').hidden&&!event.composedPath().includes(host))close();
@@ -96,7 +96,7 @@
   // Codex may consume Escape keydown in its window capture handler.
   for(const type of ['keydown','keyup'])document.addEventListener(type,event=>{if(event.key==='Escape'&&!$('panel').hidden)close()},{capture:true,signal:events.signal});
   shadow.addEventListener('keydown',event=>{if(event.key==='Escape'){event.stopPropagation();close()}});
-  $('search').oninput=render;$('filter').onchange=render;$('refresh').onclick=()=>request('list');
+  $('search').oninput=render;$('filter').onchange=render;$('refresh').onclick=()=>request('list',{revision});
   const initialReveal=Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--dream-wallpaper-reveal'));
   if(Number.isFinite(initialReveal))$('reveal').value=String(Math.round(initialReveal*100));
   $('percent').textContent=$('reveal').value+'%';
@@ -115,7 +115,7 @@
     if(result.items&&(!result.libraryInfo?.revision||result.libraryInfo.revision!==revision)){revision=result.libraryInfo?.revision;items=result.items;if(selected)selected=items.find(x=>x.id===selected.id)||null;preview();render();controls()}
     // A refresh response can arrive after Apply starts. It updates the list,
     // but must not complete the unrelated mutation or replace its progress.
-    if(result.message&&!(result.items&&busy)){$('status').textContent=result.message;busy=false;controls()}
+    if(result.message&&!((result.catalog||result.items)&&busy)){$('status').textContent=result.message;busy=false;controls()}
   };
-  request('list');
+  request('list',{revision});
 })
