@@ -1,0 +1,8 @@
+{
+  "autoDiscover": true,
+  "roots": [],
+  "steamRoots": [],
+  "wallpaperEngineDirectories": [],
+  "nativeRendering": true,
+  "refreshIntervalMs": 5000
+}
