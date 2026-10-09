@@ -1,12 +1,12 @@
 (function installPicker(token,bridgePid) {
   const existing=document.getElementById('codex-wallpaper-picker');
-  if(existing?._bridgeToken===token&&existing?._uiVersion===19) return;
+  if(existing?._bridgeToken===token&&existing?._uiVersion===20) return;
   existing?._dispose?.();
   existing?.remove();
   const host=document.createElement('div'); host.id='codex-wallpaper-picker';
   host._bridgeToken=token;
   host._bridgePid=bridgePid;
-  host._uiVersion=19;
+  host._uiVersion=20;
   const events=new AbortController();host._dispose=()=>events.abort();
   host.style.cssText='position:fixed;right:20px;bottom:94px;z-index:2147483000;font-family:inherit;';
   const shadow=host.attachShadow({mode:'open'});
@@ -77,7 +77,7 @@
     return clear;
   }
   const stopScrollGlass=installScrollGlass(document,events.signal);
-  const $=id=>shadow.getElementById(id); let items=[],selected=null,busy=false,busyOp=null,revision=null,revealTimer=null,pendingReveal=null;
+  const $=id=>shadow.getElementById(id); let items=[],selected=null,busy=false,busyOp=null,revision=null,revealTimer=null,pendingReveal=null,savedReveal=null;
   // Decode only the visible portion of the library. Unobserve before removing
   // cards so observers never retain a previous search result or closed panel.
   const thumbnailObserver=new IntersectionObserver(entries=>{
@@ -98,7 +98,7 @@
   const applyBlur=()=>{const value=Number($('blur').value);document.documentElement.style.setProperty('--wallpaper-glass-blur',value+'px');$('blur-value').textContent=String(value);$('blur').setAttribute('aria-valuetext',value===0?'无模糊':value+' 像素')};
   applyBlur();
 
-  $('blur').oninput=$('blur').onchange=()=>{applyBlur();try{localStorage.setItem(blurKey,$('blur').value)}catch{$('status').textContent='模糊程度已生效，但保存失败；重启后需重新选择。'}};
+  $('blur').oninput=$('blur').onchange=()=>{applyBlur();const value=Number($('blur').value);if(value===savedBlur)return;try{localStorage.setItem(blurKey,String(value));savedBlur=value}catch{$('status').textContent='模糊程度已生效，但保存失败；重启后需重新选择。'}};
   const applyGlass=()=>{document.documentElement.setAttribute('data-wallpaper-glass',$('glass').value);$('blur-row').hidden=$('glass').value!=='light'};
   applyGlass();
   $('glass').onchange=()=>{applyGlass();try{localStorage.setItem(glassKey,$('glass').value)}catch{$('status').textContent='当前效果已生效，但保存失败；重启后需重新选择。'}};
@@ -144,20 +144,22 @@
   $('search').oninput=render;$('filter').onchange=render;$('refresh').onclick=()=>request('list',{revision});
   const initialReveal=Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--dream-wallpaper-reveal'));
   if(Number.isFinite(initialReveal))$('reveal').value=String(Math.round(initialReveal*100));
+  savedReveal=Number($('reveal').value);
   $('percent').textContent=$('reveal').value+'%';
   $('reveal').oninput=()=>{
     $('percent').textContent=$('reveal').value+'%';
     window.__CODEX_DREAM_SKIN_STATE__?.setWallpaperReveal?.(Number($('reveal').value)/100);
     pendingReveal=Number($('reveal').value);clearTimeout(revealTimer);revealTimer=setTimeout(saveReveal,500);
   };
-  function saveReveal(){clearTimeout(revealTimer);if(busy||pendingReveal===null)return;pendingReveal=null;mutate('opacity')}
+  function saveReveal(){clearTimeout(revealTimer);if(busy||pendingReveal===null)return;if(pendingReveal===savedReveal){pendingReveal=null;return}mutate('opacity')}
   $('reveal').onchange=()=>{pendingReveal=Number($('reveal').value);saveReveal()};
-  function mutate(op,extra={}){if(busy)return;clearTimeout(revealTimer);pendingReveal=null;busy=true;busyOp=op;$('status').textContent='正在处理…';controls();request(op,{...extra,reveal:Number($('reveal').value)})}
+  function mutate(op,extra={}){if(busy)return;if(['opacity','apply','restore'].includes(op)){clearTimeout(revealTimer);pendingReveal=null}busy=true;busyOp=op;$('status').textContent='正在处理…';controls();request(op,{...extra,reveal:Number($('reveal').value)})}
   $('apply').onclick=()=>{if(selected?.supported)mutate('apply',{id:selected.id})};$('restore').onclick=()=>mutate('restore');
   $('choose-library').onclick=()=>mutate('choose-library');
   $('official-font').onclick=()=>mutate('official-font');
   $('retake').onclick=()=>{if(selected?.supported)mutate('apply',{id:selected.id,retake:true})};
   host.update=function(result){
+    if(Number.isInteger(result.savedReveal))savedReveal=result.savedReveal;
     if(result.progress&&busy)$('status').textContent=result.progress;
     if(result.libraryInfo){const info=result.libraryInfo;$('library-info').textContent=`自动同步中 · ${info.roots} 个图库来源${info.pending?' · '+info.pending+' 个目录等待下载完整或修复':''}`}
     if(result.items&&(!result.libraryInfo?.revision||result.libraryInfo.revision!==revision)){revision=result.libraryInfo?.revision;items=result.items;if(selected)selected=items.find(x=>x.id===selected.id)||null;preview();render();controls()}

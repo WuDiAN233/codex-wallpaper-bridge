@@ -166,7 +166,7 @@ async function handle(session,event){
       if(Math.abs(Number(saved.media?.opacity)-request.reveal/100)>.001)throw new Error('背景可见度尚未保存。');
       const actual=await session.evaluate(`(()=>{const runtime=window.__CODEX_DREAM_SKIN_STATE__;if(!runtime?.setWallpaperReveal)throw new Error('壁纸尚未加载');runtime.setWallpaperReveal(${request.reveal/100});return Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--dream-wallpaper-reveal'))})()`);
       if(Math.abs(actual-request.reveal/100)>.001)throw new Error('背景可见度尚未生效。');
-      await reply(session,{message:'背景可见度已更新。'});return;
+      await reply(session,{message:'背景可见度已自动保存。',savedReveal:request.reveal});return;
     }
     // Only the watcher writes renderer media. A second --once injection can
     // overwrite its in-progress chunk transfer; verify the watcher's revision.

@@ -1,0 +1,8 @@
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs/promises';import vm from 'node:vm';
+const source=await fs.readFile(new URL('./picker-ui.js',import.meta.url),'utf8');
+const save=source.slice(source.indexOf('  function saveReveal()'),source.indexOf("  $('reveal').onchange="));
+const mutate=source.slice(source.indexOf('  function mutate('),source.indexOf("  $('apply').onclick="));
+function fixture(pending,saved){const requests=[];const context=vm.createContext({clearTimeout(){},controls(){},request:(op,data)=>requests.push({op,...data}),$:()=>({value:String(pending),textContent:''})});vm.runInContext(`let busy=false,busyOp=null,revealTimer=null,pendingReveal=${pending},savedReveal=${saved};${save}${mutate}`,context);return {requests,run:s=>vm.runInContext(s,context)}}
+test('unchanged opacity is not saved again',()=>{const f=fixture(70,70);f.run('saveReveal()');assert.equal(f.requests.length,0);assert.equal(f.run('pendingReveal'),null)});
+test('other actions retain pending opacity until their completion',()=>{const f=fixture(40,70);f.run("mutate('official-font')");assert.equal(f.run('pendingReveal'),40);f.run('saveReveal()');assert.equal(f.requests.length,1);f.run('busy=false;saveReveal()');assert.deepEqual(f.requests.map(r=>r.op),['official-font','opacity']);assert.equal(f.requests[1].reveal,40)});
+test('an in-flight save keeps only the newest requested value',()=>{const f=fixture(40,70);f.run('busy=true;pendingReveal=50;saveReveal();pendingReveal=40;saveReveal()');assert.equal(f.requests.length,0);f.run('busy=false;saveReveal()');assert.equal(f.requests.length,1);assert.equal(f.requests[0].reveal,40)});
