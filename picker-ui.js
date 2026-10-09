@@ -1,12 +1,12 @@
 (function installPicker(token,bridgePid) {
   const existing=document.getElementById('codex-wallpaper-picker');
-  if(existing?._bridgeToken===token&&existing?._uiVersion===15) return;
+  if(existing?._bridgeToken===token&&existing?._uiVersion===16) return;
   existing?._dispose?.();
   existing?.remove();
   const host=document.createElement('div'); host.id='codex-wallpaper-picker';
   host._bridgeToken=token;
   host._bridgePid=bridgePid;
-  host._uiVersion=15;
+  host._uiVersion=16;
   const events=new AbortController();host._dispose=()=>events.abort();
   host.style.cssText='position:fixed;right:20px;bottom:94px;z-index:2147483000;font-family:inherit;';
   const shadow=host.attachShadow({mode:'open'});
@@ -45,13 +45,29 @@
   `;
   // Keep blur on a single message surface, never nested blocks or the whole page.
   brightness.textContent+=`
-    html[data-dream-skin="active"][data-wallpaper-glass="light"]:has(#codex-wallpaper-picker) :is(
+    html[data-dream-skin="active"][data-wallpaper-glass="light"]:not([data-wallpaper-scrolling]):has(#codex-wallpaper-picker) :is(
       [data-user-message-bubble],
       .thread-scroll-container [data-local-conversation-final-assistant],
       .thread-scroll-container [data-response-annotation-conversation][data-response-annotation-target]:not([data-local-conversation-final-assistant] *),
       .thread-scroll-container [data-markdown-text-style]:not([data-response-annotation-conversation] *):not([data-local-conversation-final-assistant] *)
     ){background:rgb(var(--ds-panel-rgb) / .84)!important;backdrop-filter:blur(6px)!important;-webkit-backdrop-filter:blur(6px)!important}
+    html[data-dream-skin="active"][data-wallpaper-glass="light"][data-wallpaper-scrolling]:has(#codex-wallpaper-picker) [data-user-message-bubble]{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
   `;
+  function installScrollGlass(doc,signal){
+    let timer;
+    const clear=()=>{clearTimeout(timer);doc.documentElement.removeAttribute('data-wallpaper-scrolling')};
+    const scrolling=event=>{
+      if(doc.documentElement.getAttribute('data-wallpaper-glass')!=='light'||!event.target?.closest?.('.thread-scroll-container'))return;
+      doc.documentElement.setAttribute('data-wallpaper-scrolling','');
+      clearTimeout(timer);timer=setTimeout(clear,160);
+    };
+    // Wheel precedes the first scroll paint; scroll also covers keys, scrollbar
+    // dragging and programmatic movement. No geometry reads or per-frame work.
+    for(const type of ['wheel','touchmove','scroll'])doc.addEventListener(type,scrolling,{capture:true,passive:true,signal});
+    signal.addEventListener('abort',clear,{once:true});
+    return clear;
+  }
+  const stopScrollGlass=installScrollGlass(document,events.signal);
   const $=id=>shadow.getElementById(id); let items=[],selected=null,busy=false,revision=null;
   // Decode only the visible portion of the library. Unobserve before removing
   // cards so observers never retain a previous search result or closed panel.
@@ -63,7 +79,7 @@
     }
   },{root:$('panel'),rootMargin:'100px'});
   const releaseThumbnails=()=>{thumbnailObserver.disconnect();$('grid').replaceChildren();$('preview').removeAttribute('src')};
-  host._dispose=()=>{events.abort();releaseThumbnails()};
+  host._dispose=()=>{events.abort();stopScrollGlass();releaseThumbnails()};
   const glassKey='codex-wallpaper-bridge:message-glass';
   try{$('glass').value=localStorage.getItem(glassKey)==='light'?'light':'solid'}catch{$('glass').value='solid'}
   const applyGlass=()=>document.documentElement.setAttribute('data-wallpaper-glass',$('glass').value);
