@@ -10,6 +10,7 @@ import {scanLibrary,LibraryMonitor,librarySignature} from './library.mjs';
 import {FileCache} from './file-cache.mjs';
 import {readConfig,addLocation,saveConfig} from './configuration.mjs';
 import {Thumbnails} from './thumbnails.mjs';
+import {SnapshotCache,snapshotKey} from './snapshot-cache.mjs';
 import {NativeRenderer,prepareNativeExpression,clearNativeExpression,discardNativeExpression} from './native-media.mjs';
 const here=path.dirname(fileURLToPath(import.meta.url));
 const stateRoot=path.join(process.env.LOCALAPPDATA,'CodexDreamSkin');
@@ -20,6 +21,7 @@ const config=await readConfig(here);
 const fileCache=new FileCache();
 let library=await scanLibrary(config,fileCache);
 const thumbnails=new Thumbnails(here);
+const snapshots=new SnapshotCache(path.join(here,'static-cache'));
 await thumbnails.fill(library.items);
 if(process.argv.includes('--catalog')) {
   console.log(JSON.stringify({total:library.items.length,supported:library.items.filter(x=>x.supported).length,
@@ -78,7 +80,8 @@ async function handle(session,event){
   if(typeof event.payload!=='string'||event.payload.length>1024)return;
   let request;try{request=JSON.parse(event.payload)}catch{return}
   if(request.token!==token||!['list','apply','opacity','restore','choose-library','official-font'].includes(request.op))return;
-  const allowed=new Set(['token','op','id','reveal']);if(Object.keys(request).some(key=>!allowed.has(key)))return;
+  const allowed=new Set(['token','op','id','reveal','retake']);if(Object.keys(request).some(key=>!allowed.has(key)))return;
+  if(request.retake!==undefined&&(typeof request.retake!=='boolean'||request.op!=='apply'))return;
   const probe=await session.evaluate(`location.protocol==='app:' && !!document.querySelector('main,aside.app-shell-left-panel,[data-testid="composer"]')`);if(!probe)throw new Error('当前页面不是 Codex 工作区');
   if(request.op==='list'){
     // Show the last verified catalog immediately; publish changes after scanning.
@@ -106,9 +109,10 @@ async function handle(session,event){
     }finally{changing=false}
   }
   if(request.op!=='restore'&&(!Number.isInteger(request.reveal)||request.reveal<0||request.reveal>100))throw new Error('背景可见度必须在 0–100% 之间');
-  await identity();changing=true;
+  changing=true;
   let backup=null,nativeBefore=null,pendingNative=null,preparedNative=null,activeMediaPath=null,colors=null;
   try {
+    await identity();
     const args=['-NoProfile','-ExecutionPolicy','RemoteSigned','-File',path.join(here,'theme-action.ps1'),'-Action'];
     if(request.op==='apply'){
       await monitor.refresh(true);
@@ -121,16 +125,20 @@ async function handle(session,event){
       await fs.cp(path.join(stateRoot,'active-theme'),backup,{recursive:true,dereference:false});
       activeMediaPath=validated;
       if(item.mode==='native'||item.type==='video'){
+        const key=await snapshotKey(item);
+        let snapshot=request.retake?null:await snapshots.get(key);
+        if(!snapshot){
         pendingNative=await nativeRenderer.begin(item);
         preparedNative=await session.evaluate(prepareNativeExpression(pendingNative.id,pendingNative.handle));
-        const frames=path.join(here,'native-frames');await fs.mkdir(frames,{recursive:true});
-        activeMediaPath=path.join(frames,pendingNative.id+'.png');
-        if(!preparedNative.frame?.startsWith('data:image/png;base64,')||preparedNative.frame.length>32*1024*1024)throw new Error('Invalid rendered wallpaper frame');
-        await fs.writeFile(activeMediaPath,Buffer.from(preparedNative.frame.split(',')[1],'base64'));
         colors=paletteFromPixels(preparedNative.pixels);
         // Release capture and the temporary renderer before applying the image.
         await session.evaluate(discardNativeExpression);
         await nativeRenderer.close(pendingNative);pendingNative=null;
+        if(await snapshotKey(item)!==key)throw new Error('壁纸文件在取景期间发生变化，请待下载完成后重试。');
+        snapshot=await snapshots.put(key,preparedNative.frame,colors);
+        preparedNative=null;
+        }
+        activeMediaPath=snapshot.file;colors=snapshot.colors;
       }
       args.push('Apply','-MediaPath',activeMediaPath,'-Title',item.name,'-Reveal',String(request.reveal));
       if(colors)args.push('-PaletteJson',JSON.stringify(colors));

@@ -4,7 +4,7 @@
 
 ## 下载和启动
 
-1. 从 [Releases](https://github.com/WuDiAN233/codex-wallpaper-bridge/releases) 下载 `CodexWallpaperBridge-v0.2.0-windows.zip`，解压到你有写入权限的固定目录。支持中文、空格和不同盘符。
+1. 从 [Releases](https://github.com/WuDiAN233/codex-wallpaper-bridge/releases) 下载 `CodexWallpaperBridge-v0.2.1-windows.zip`，解压到你有写入权限的固定目录。支持中文、空格和不同盘符。
 2. 首次安装前关闭 Codex，双击 `Setup.cmd`。缺少基础组件时，会下载并校验 [Codex Dynamic Skin v1.6.2](https://github.com/CCDawn/Codex-Dynamic-Skin/releases/tag/v1.6.2) 的原版安装程序，然后显示安装向导；安装位置由你选择。
 3. 启动 Wallpaper Engine，再通过桌面的 **Codex Wallpaper Bridge** 快捷方式或 `Start-Picker.cmd` 打开 Codex。
 4. 点击右下角 **壁纸**。正常安装的 Steam / Wallpaper Engine 会被自动发现；未识别时点击 **选择图库目录**。
@@ -27,6 +27,10 @@
 - “恢复原生外观”隐藏壁纸并恢复首次接入前的原生颜色；备份保留在本机。
 
 场景和视频在应用时由 Wallpaper Engine 临时渲染一次，取最高 1920×1080 的 PNG 静帧，随后立即停止采集并关闭本扩展创建的取景窗口。普通图片直接使用原图。平时只显示静态图片，没有持续视频解码或场景采集；不会关闭用户自己的桌面壁纸。图库仍自动识别新增壁纸。不会录制整个桌面或采集音频。
+
+静帧缓存最多保留 24 张、图片总量上限 128 MiB；重复切换直接复用高清图片和配色。项目或主媒体文件变更会失效，修改场景内部资源或 Wallpaper Engine 属性后可点“重新取景”。缓存保存在本机 static-cache，不进入发行包。
+
+消息框可切换“实色”和“轻度毛玻璃”，选择会在本机保存。轻度效果只对消息表层使用 6px 模糊，不模糊整页、侧栏或输入框；仍有额外合成与显存开销，优先省资源时选择实色。
 
 ## 兼容范围
 
