@@ -6,6 +6,7 @@ $env:PSModulePath=(Join-Path $PSHOME 'Modules')+';'+$env:PSModulePath
 $engine=Join-Path $env:LOCALAPPDATA 'CodexDreamSkin\engine'
 . (Join-Path $engine 'scripts\common-windows.ps1')
 . (Join-Path $engine 'scripts\theme-windows.ps1')
+. (Join-Path $PSScriptRoot 'runtime-lease.ps1')
 $lock=Enter-DreamSkinOperationLock
 try {
   if($Action -eq 'Restore') { $null=Set-DreamSkinPaused -Paused $true; exit 0 }
@@ -32,8 +33,10 @@ try {
     Write-DreamSkinTheme -ThemeDirectory $paths.Active -Theme $theme
     exit 0
   }
+  Invoke-WithPinnedWallpaperRuntime -RuntimePath (Join-Path $engine 'runtime\node\node.exe') -Action {
   if($theme.media.type -eq 'video' -and $MediaPath -match '[\\/]steamapps[\\/]workshop[\\/]content[\\/]431960[\\/]\d+[\\/]') {
     $null=Set-DreamSkinActiveWallpaperEngineTheme -MediaPath $MediaPath -Name $Title -Theme $theme
   } else { $null=Set-DreamSkinActiveTheme -ImagePath $MediaPath -Theme $theme -Name $Title }
+  }
   $null=Set-DreamSkinPaused -Paused $false
 } finally { Exit-DreamSkinOperationLock -Mutex $lock }

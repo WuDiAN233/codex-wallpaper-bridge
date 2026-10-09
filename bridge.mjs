@@ -13,6 +13,7 @@ import {Thumbnails} from './thumbnails.mjs';
 import {SnapshotCache,snapshotKey} from './snapshot-cache.mjs';
 import {catalogUpdate,isWallpaperPage} from './catalog-delivery.mjs';
 import {backupTheme} from './theme-backup.mjs';
+import {verifyStatic} from './verify-static.mjs';
 import {NativeRenderer,prepareNativeExpression,clearNativeExpression,discardNativeExpression} from './native-media.mjs';
 const here=path.dirname(fileURLToPath(import.meta.url));
 const stateRoot=path.join(process.env.LOCALAPPDATA,'CodexDreamSkin');
@@ -155,16 +156,16 @@ async function handle(session,event){
     }
     // Only the watcher writes renderer media. A second --once injection can
     // overwrite its in-progress chunk transfer; verify the watcher's revision.
-    await run(node,[path.join(engine,'scripts','injector.mjs'),'--port',String(state.port),'--browser-id',state.browserId,
-      request.op==='restore'?'--remove':'--verify','--timeout-ms','25000','--theme-dir',path.join(stateRoot,'active-theme'),'--pause-file',state.pauseFile]);
+    if(request.op==='restore')await run(node,[path.join(engine,'scripts','injector.mjs'),'--port',String(state.port),'--browser-id',state.browserId,
+      '--remove','--timeout-ms','25000','--theme-dir',path.join(stateRoot,'active-theme'),'--pause-file',state.pauseFile]);
+    else await verifyStatic(session,engine,path.join(stateRoot,'active-theme'));
     if(request.op==='apply'){
       const item=library.items.find(x=>x.id===request.id);
       if(!colors){
         colors=paletteFromPixels(await session.evaluate(sampleWallpaperExpression));
         await run(powershell,['-NoProfile','-ExecutionPolicy','RemoteSigned','-File',path.join(here,'theme-action.ps1'),'-Action','Palette',
           '-MediaPath',activeMediaPath,'-Title',item.name,'-PaletteJson',JSON.stringify(colors)]);
-        await run(node,[path.join(engine,'scripts','injector.mjs'),'--port',String(state.port),'--browser-id',state.browserId,
-          '--verify','--timeout-ms','25000','--theme-dir',path.join(stateRoot,'active-theme')]);
+        await verifyStatic(session,engine,path.join(stateRoot,'active-theme'));
       }
       const variant=nativeBefore.mode==='light'?'light':nativeBefore.mode==='dark'?'dark':await session.evaluate(`window.electronBridge.getSystemThemeVariant()`);
       await session.evaluate(applyAppearanceExpression(colors,variant));
@@ -190,7 +191,7 @@ async function handle(session,event){
       if(failures.length)e.message+='；取景清理未确认：'+failures.join('；');
     }
     if(backup){
-      try {await fs.cp(backup,path.join(stateRoot,'active-theme'),{recursive:true,force:true});await run(node,[path.join(engine,'scripts','injector.mjs'),'--port',String(state.port),'--browser-id',state.browserId,'--verify','--timeout-ms','25000','--theme-dir',path.join(stateRoot,'active-theme')]);}
+      try {await fs.cp(backup,path.join(stateRoot,'active-theme'),{recursive:true,force:true});const restored=JSON.parse((await fs.readFile(path.join(stateRoot,'active-theme','theme.json'),'utf8')).replace(/^\uFEFF/,''));if(restored.media?.type==='image')await verifyStatic(session,engine,path.join(stateRoot,'active-theme'));else await run(node,[path.join(engine,'scripts','injector.mjs'),'--port',String(state.port),'--browser-id',state.browserId,'--verify','--timeout-ms','25000','--theme-dir',path.join(stateRoot,'active-theme')]);}
       catch(rollbackError){throw new Error(`切换失败，恢复也未确认：${rollbackError.message}。备份已保留。`)}
       if(nativeBefore)await session.evaluate(restoreAppearanceExpression(nativeBefore));
     }
