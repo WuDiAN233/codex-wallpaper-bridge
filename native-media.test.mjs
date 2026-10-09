@@ -39,8 +39,8 @@ test('static startup cleans the previous renderer without opening or requiring i
 test('static snapshots retain decoded resolution and disposing releases every capture track',async()=>{
  let stopped=0,removed=false,paused=false;
  const stream={getTracks:()=>[{stop(){stopped++}},{stop(){stopped++}}]};
- const video={videoWidth:1868,videoHeight:1080,play:async()=>{},pause(){paused=true},remove(){removed=true},requestVideoFrameCallback(fn){fn();return 1},cancelVideoFrameCallback(){}};
- const context=vm.createContext({window:{},navigator:{mediaDevices:{getUserMedia:async()=>stream}},setTimeout,clearTimeout,
+ const video={readyState:4,addEventListener(){},removeEventListener(){},videoWidth:1868,videoHeight:1080,play:async()=>{},pause(){paused=true},remove(){removed=true},requestVideoFrameCallback(){throw new Error('Presentation callback must not be required')},cancelVideoFrameCallback(){}};
+ const context=vm.createContext({window:{},navigator:{mediaDevices:{getUserMedia:async()=>stream}},setTimeout,clearTimeout,setInterval,clearInterval,
   document:{createElement(tag){if(tag==='video')return video;return {width:0,height:0,getContext:()=>({drawImage(){},getImageData:()=>({data:[100,100,100,255]})}),toDataURL(){return `data:image/png;base64,${this.width}x${this.height}`}}}}});
  const result=await vm.runInContext(prepareNativeExpression('snapshot',123),context);
  assert.equal(result.frame,'data:image/png;base64,1868x1080');assert.equal(stopped,0);

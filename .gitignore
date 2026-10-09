@@ -4,6 +4,7 @@
 /*.log
 /*.pid
 /status.json
+/last-switch.json
 /active-native.json*
 /native-appearance-*.json
 /native-font-*.json

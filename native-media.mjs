@@ -15,10 +15,20 @@ async function prepareNative(id,handle){
     // Opening the native window can precede texture loading. Require a decoded,
     // usable frame within a bounded interval instead of committing a black loader.
     await new Promise((resolve,reject)=>{
-      const probe=document.createElement('canvas');probe.width=40;probe.height=24;const context=probe.getContext('2d',{willReadFrequently:true});let callback;
-      timer=setTimeout(()=>{video.cancelVideoFrameCallback(callback);reject(new Error('动态场景尚未输出可用画面'))},5000);
-      const check=()=>{context.drawImage(video,0,0,40,24);const pixels=context.getImageData(0,0,40,24).data;let usable=false;for(let i=0;i<pixels.length;i+=4){const sum=Math.max(pixels[i],pixels[i+1],pixels[i+2])+Math.min(pixels[i],pixels[i+1],pixels[i+2]);if(pixels[i+3]>=128&&sum>=41&&sum<=479){usable=true;break}}if(usable){clearTimeout(timer);resolve()}else callback=video.requestVideoFrameCallback(check)};
-      callback=video.requestVideoFrameCallback(check);video.play().catch(error=>{clearTimeout(timer);video.cancelVideoFrameCallback(callback);reject(error)});
+      const probe=document.createElement('canvas');probe.width=40;probe.height=24;const context=probe.getContext('2d',{willReadFrequently:true});let done=false,poll;
+      const finish=error=>{if(done)return;done=true;clearTimeout(timer);clearInterval(poll);video.removeEventListener('loadeddata',check);video.removeEventListener('loadedmetadata',check);error?reject(error):resolve()};
+      function check(){
+        if(done||video.readyState<2||!video.videoWidth||!video.videoHeight)return;
+        try{context.drawImage(video,0,0,40,24);const pixels=context.getImageData(0,0,40,24).data;
+          for(let i=0;i<pixels.length;i+=4){const sum=Math.max(pixels[i],pixels[i+1],pixels[i+2])+Math.min(pixels[i],pixels[i+1],pixels[i+2]);if(pixels[i+3]>=128&&sum>=41&&sum<=479){finish();return}}
+        }catch(error){finish(error)}
+      }
+      // Presentation callbacks can be suppressed in background windows. Inspect
+      // decoded frames directly; retain the same timeout and nonblank check.
+      timer=setTimeout(()=>finish(new Error('高清场景尚未输出可用画面；解码状态 '+video.readyState)),5000);
+      poll=setInterval(check,150);
+      video.addEventListener('loadeddata',check);video.addEventListener('loadedmetadata',check);
+      video.play().then(check,finish);check();
     });
     const canvas=document.createElement('canvas');canvas.width=video.videoWidth;canvas.height=video.videoHeight;const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.drawImage(video,0,0,canvas.width,canvas.height);
     const frame=canvas.toDataURL('image/png');canvas.width=40;canvas.height=24;ctx.drawImage(video,0,0,40,24);

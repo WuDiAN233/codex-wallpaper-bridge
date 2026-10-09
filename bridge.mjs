@@ -14,6 +14,7 @@ import {SnapshotCache,snapshotKey} from './snapshot-cache.mjs';
 import {catalogUpdate,isWallpaperPage} from './catalog-delivery.mjs';
 import {backupTheme} from './theme-backup.mjs';
 import {verifyStatic} from './verify-static.mjs';
+import {PreparedThemeAction} from './theme-worker.mjs';
 import {NativeRenderer,prepareNativeExpression,clearNativeExpression,discardNativeExpression} from './native-media.mjs';
 const here=path.dirname(fileURLToPath(import.meta.url));
 const stateRoot=path.join(process.env.LOCALAPPDATA,'CodexDreamSkin');
@@ -115,10 +116,15 @@ async function handle(session,event){
   if(request.op!=='restore'&&(!Number.isInteger(request.reveal)||request.reveal<0||request.reveal>100))throw new Error('背景可见度必须在 0–100% 之间');
   changing=true;
   let backup=null,nativeBefore=null,pendingNative=null,preparedNative=null,activeMediaPath=null,colors=null;
+  let closingNative=null,closeFailure=null;
+  let preparedTheme=null;
+  const started=performance.now(),stages=[];let phase=null,phaseStarted=started,cacheHit=null,succeeded=false;
+  const progress=async label=>{const now=performance.now();if(phase)stages.push({step:phase,ms:Math.round(now-phaseStarted)});phase=label;phaseStarted=now;await reply(session,{progress:label})};
   try {
     await identity();
     const args=['-NoProfile','-ExecutionPolicy','RemoteSigned','-File',path.join(here,'theme-action.ps1'),'-Action'];
     if(request.op==='apply'){
+      await progress('正在读取壁纸…');
       await monitor.refresh(true);
       const item=library.items.find(x=>x.id===request.id);if(!item?.supported)throw new Error('壁纸不可用，请刷新图库');
       nativeBefore=await session.evaluate(readAppearanceExpression);
@@ -130,13 +136,19 @@ async function handle(session,event){
       if(item.mode==='native'||item.type==='video'){
         const key=await snapshotKey(item);
         let snapshot=request.retake?null:await snapshots.get(key);
+        cacheHit=!!snapshot;
         if(!snapshot){
+        preparedTheme=new PreparedThemeAction(powershell,['-NoProfile','-ExecutionPolicy','RemoteSigned','-File',path.join(here,'theme-action.ps1'),'-Prepare']);
+        await progress('正在打开高清取景窗口…');
         pendingNative=await nativeRenderer.begin(item);
+        await progress('正在等待高清画面…');
         preparedNative=await session.evaluate(prepareNativeExpression(pendingNative.id,pendingNative.handle));
+        await progress('正在保存高清静帧…');
         colors=paletteFromPixels(preparedNative.pixels);
-        // Release capture and the temporary renderer before applying the image.
+        // Stop capture now. Closing the isolated renderer can overlap image
+        // saving/application, but success still waits for confirmed closure.
         await session.evaluate(discardNativeExpression);
-        await nativeRenderer.close(pendingNative);pendingNative=null;
+        closingNative=nativeRenderer.close(pendingNative).then(()=>{pendingNative=null},error=>{closeFailure=error});
         if(await snapshotKey(item)!==key)throw new Error('壁纸文件在取景期间发生变化，请待下载完成后重试。');
         snapshot=await snapshots.put(key,preparedNative.frame,colors);
         preparedNative=null;
@@ -146,7 +158,9 @@ async function handle(session,event){
       args.push('Apply','-MediaPath',activeMediaPath,'-Title',item.name,'-Reveal',String(request.reveal));
       if(colors)args.push('-PaletteJson',JSON.stringify(colors));
     }else if(request.op==='opacity')args.push('Opacity','-Reveal',String(request.reveal));else args.push('Restore');
-    await run(powershell,args);
+    if(request.op==='apply')await progress('正在应用壁纸…');
+    if(preparedTheme)await preparedTheme.apply({MediaPath:activeMediaPath,Title:library.items.find(x=>x.id===request.id).name,Reveal:request.reveal,PaletteJson:JSON.stringify(colors)});
+    else await run(powershell,args);
     if(request.op==='opacity'){
       const saved=JSON.parse((await fs.readFile(path.join(stateRoot,'active-theme/theme.json'),'utf8')).replace(/^\uFEFF/,''));
       if(Math.abs(Number(saved.media?.opacity)-request.reveal/100)>.001)throw new Error('背景可见度尚未保存。');
@@ -156,6 +170,7 @@ async function handle(session,event){
     }
     // Only the watcher writes renderer media. A second --once injection can
     // overwrite its in-progress chunk transfer; verify the watcher's revision.
+    if(request.op==='apply')await progress('正在确认图片加载…');
     if(request.op==='restore')await run(node,[path.join(engine,'scripts','injector.mjs'),'--port',String(state.port),'--browser-id',state.browserId,
       '--remove','--timeout-ms','25000','--theme-dir',path.join(stateRoot,'active-theme'),'--pause-file',state.pauseFile]);
     else await verifyStatic(session,engine,path.join(stateRoot,'active-theme'));
@@ -167,12 +182,14 @@ async function handle(session,event){
           '-MediaPath',activeMediaPath,'-Title',item.name,'-PaletteJson',JSON.stringify(colors)]);
         await verifyStatic(session,engine,path.join(stateRoot,'active-theme'));
       }
+      await progress('正在同步主题色…');
       const variant=nativeBefore.mode==='light'?'light':nativeBefore.mode==='dark'?'dark':await session.evaluate(`window.electronBridge.getSystemThemeVariant()`);
       await session.evaluate(applyAppearanceExpression(colors,variant));
       const nativeAfter=await session.evaluate(readAppearanceExpression);
       const actual=nativeAfter.themes[variant].chromeTheme;
       if(actual.accent.toLowerCase()!==colors.accent||actual.surface.toLowerCase()!==colors.background||actual.ink.toLowerCase()!==colors.text)throw new Error('Codex 原生主题颜色尚未同步');
       await fs.writeFile(path.join(here,'native-appearance-current.json'),JSON.stringify({wallpaper:item.name,variant,accent:actual.accent,surface:actual.surface,ink:actual.ink,fonts:actual.fonts,updatedAt:new Date().toISOString()},null,2));
+      if(closingNative){await closingNative;if(closeFailure)throw closeFailure}
       for(const target of sessions.values())await target.evaluate(clearNativeExpression);
       await nativeRenderer.clear();
       nativeRecoveryError=null;session.nativeFailure=null;
@@ -183,8 +200,11 @@ async function handle(session,event){
       const original=await fs.readFile(path.join(here,'native-appearance-original.json'),'utf8').catch(e=>{if(e.code==='ENOENT')return null;throw e});
       if(original)await session.evaluate(restoreAppearanceExpression(JSON.parse(original)));
     }
+    succeeded=true;
     await reply(session,{message:request.op==='restore'?'已隐藏壁纸并恢复原生界面。':request.op==='opacity'?'背景可见度已更新。':'壁纸已应用为静态图片，后台取景已停止，主题色已同步。'});
   } catch(e){
+    if(preparedTheme)await preparedTheme.cancel();
+    if(closingNative)await closingNative;
     if(pendingNative){
       const cleanup=await Promise.allSettled([session.evaluate(discardNativeExpression),nativeRenderer.close(pendingNative)]);
       const failures=cleanup.filter(x=>x.status==='rejected').map(x=>x.reason.message);
@@ -196,7 +216,13 @@ async function handle(session,event){
       if(nativeBefore)await session.evaluate(restoreAppearanceExpression(nativeBefore));
     }
     throw e;
-  } finally {changing=false}
+  } finally {
+    if(request.op==='apply'){
+      if(phase)stages.push({step:phase,ms:Math.round(performance.now()-phaseStarted)});
+      await fs.writeFile(path.join(here,'last-switch.json'),JSON.stringify({cacheHit,succeeded,totalMs:Math.round(performance.now()-started),stages},null,2)).catch(e=>console.error('切换耗时记录失败：'+e.message));
+    }
+    changing=false;
+  }
 }
 let lastStatus='',lastStatusAt=0;
 async function attach(){

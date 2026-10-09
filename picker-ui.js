@@ -1,12 +1,12 @@
 (function installPicker(token,bridgePid) {
   const existing=document.getElementById('codex-wallpaper-picker');
-  if(existing?._bridgeToken===token&&existing?._uiVersion===13) return;
+  if(existing?._bridgeToken===token&&existing?._uiVersion===14) return;
   existing?._dispose?.();
   existing?.remove();
   const host=document.createElement('div'); host.id='codex-wallpaper-picker';
   host._bridgeToken=token;
   host._bridgePid=bridgePid;
-  host._uiVersion=13;
+  host._uiVersion=14;
   const events=new AbortController();host._dispose=()=>events.abort();
   host.style.cssText='position:fixed;right:20px;bottom:94px;z-index:2147483000;font-family:inherit;';
   const shadow=host.attachShadow({mode:'open'});
@@ -111,6 +111,7 @@
   $('official-font').onclick=()=>mutate('official-font');
   $('retake').onclick=()=>{if(selected?.supported)mutate('apply',{id:selected.id,retake:true})};
   host.update=function(result){
+    if(result.progress&&busy)$('status').textContent=result.progress;
     if(result.libraryInfo){const info=result.libraryInfo;$('library-info').textContent=`自动同步中 · ${info.roots} 个图库来源${info.pending?' · '+info.pending+' 个目录等待下载完整或修复':''}`}
     if(result.items&&(!result.libraryInfo?.revision||result.libraryInfo.revision!==revision)){revision=result.libraryInfo?.revision;items=result.items;if(selected)selected=items.find(x=>x.id===selected.id)||null;preview();render();controls()}
     // A refresh response can arrive after Apply starts. It updates the list,

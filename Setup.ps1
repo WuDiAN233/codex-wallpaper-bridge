@@ -1,7 +1,7 @@
 ﻿param([switch]$CheckOnly)
 $ErrorActionPreference='Stop'
 $engine=Join-Path $env:LOCALAPPDATA 'CodexDreamSkin\engine'
-$required=@('bridge.mjs','snapshot-cache.mjs','catalog-delivery.mjs','theme-backup.mjs','runtime-lease.ps1','verify-static.mjs','picker-ui.js','config.example.json','compat-manifest.json','Start-Picker.ps1','thumbnails.ps1','discover-windows.ps1')
+$required=@('bridge.mjs','snapshot-cache.mjs','catalog-delivery.mjs','theme-backup.mjs','runtime-lease.ps1','verify-static.mjs','theme-worker.mjs','picker-ui.js','config.example.json','compat-manifest.json','Start-Picker.ps1','thumbnails.ps1','discover-windows.ps1')
 foreach($file in $required){if(-not(Test-Path -LiteralPath (Join-Path $PSScriptRoot $file) -PathType Leaf)){throw "Package is incomplete: $file"}}
 if($CheckOnly){[pscustomobject]@{PackageComplete=$true;EngineInstalled=(Test-Path -LiteralPath (Join-Path $engine 'runtime\node\node.exe'));RequiresEngineVersion='1.6.2'}|ConvertTo-Json;exit}
 if(-not(Test-Path -LiteralPath (Join-Path $engine 'runtime\node\node.exe'))){
