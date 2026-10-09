@@ -1,12 +1,12 @@
 (function installPicker(token,bridgePid) {
   const existing=document.getElementById('codex-wallpaper-picker');
-  if(existing?._bridgeToken===token&&existing?._uiVersion===18) return;
+  if(existing?._bridgeToken===token&&existing?._uiVersion===19) return;
   existing?._dispose?.();
   existing?.remove();
   const host=document.createElement('div'); host.id='codex-wallpaper-picker';
   host._bridgeToken=token;
   host._bridgePid=bridgePid;
-  host._uiVersion=18;
+  host._uiVersion=19;
   const events=new AbortController();host._dispose=()=>events.abort();
   host.style.cssText='position:fixed;right:20px;bottom:94px;z-index:2147483000;font-family:inherit;';
   const shadow=host.attachShadow({mode:'open'});
@@ -23,7 +23,7 @@
   <div class="sub">自动识别 Wallpaper Engine 图库与新增壁纸，主题色跟随画面。所有壁纸应用为静态图片；场景和视频仅在选择时取景，完成后停止后台渲染。</div>
   <div class="row" style="margin-top:16px"><input class="grow" id="search" type="search" placeholder="搜索壁纸" aria-label="搜索壁纸"><select id="filter" aria-label="壁纸类型"><option value="all">全部壁纸</option><option value="supported">可用壁纸</option><option value="scene">场景静帧</option><option value="web">网页壁纸</option><option value="video">视频</option><option value="image">图片</option></select></div>
   <div class="row"><div id="library-info" class="sub grow">正在检查图库…</div><button id="official-font">默认字体</button><button id="choose-library">选择图库目录</button></div><div id="count" class="sub"></div><div id="grid"></div><div id="selection" hidden><img id="preview" class="preview" alt="所选壁纸预览"><div id="selected-name" class="sub"></div></div>
-  <div class="footer"><div class="row"><label for="glass">消息框</label><select id="glass" aria-label="消息框效果"><option value="solid">实色 · 更省资源</option><option value="light">毛玻璃</option></select></div><div class="row" id="blur-row"><label for="blur">模糊程度</label><input id="blur" type="range" min="0" max="20" step="1" value="6" style="flex:1;min-width:0;accent-color:var(--ds-accent,#339cff)"><output id="blur-value" for="blur">6</output></div><div class="row"><label for="reveal">背景可见度</label><input id="reveal" type="range" min="0" max="100" value="65"><output id="percent">65%</output></div><div class="row"><button id="apply" disabled>应用静态壁纸</button><button id="retake" disabled title="重新获取所选场景或视频的画面">重新取景</button><button id="opacity">调整当前背景</button><span class="grow"></span><button id="restore">恢复原生外观</button></div><div id="status" role="status"></div></div></section>`;
+  <div class="footer"><div class="row"><label for="glass">消息框</label><select id="glass" aria-label="消息框效果"><option value="solid">实色 · 更省资源</option><option value="light">毛玻璃</option></select></div><div class="row" id="blur-row"><label for="blur">模糊程度</label><input id="blur" type="range" min="0" max="20" step="1" value="6" style="flex:1;min-width:0;accent-color:var(--ds-accent,#339cff)"><output id="blur-value" for="blur">6</output></div><div class="row"><label for="reveal">背景可见度</label><input id="reveal" type="range" min="0" max="100" value="65"><output id="percent">65%</output></div><div class="row"><button id="apply" disabled>应用静态壁纸</button><button id="retake" disabled title="重新获取所选场景或视频的画面">重新取景</button><span class="grow"></span><button id="restore">恢复原生外观</button></div><div id="status" role="status"></div></div></section>`;
   document.body.append(host);
   let brightness=document.getElementById('codex-wallpaper-brightness');
   if(!brightness){brightness=document.createElement('style');brightness.id='codex-wallpaper-brightness';document.head.append(brightness)}
@@ -77,7 +77,7 @@
     return clear;
   }
   const stopScrollGlass=installScrollGlass(document,events.signal);
-  const $=id=>shadow.getElementById(id); let items=[],selected=null,busy=false,revision=null;
+  const $=id=>shadow.getElementById(id); let items=[],selected=null,busy=false,busyOp=null,revision=null,revealTimer=null,pendingReveal=null;
   // Decode only the visible portion of the library. Unobserve before removing
   // cards so observers never retain a previous search result or closed panel.
   const thumbnailObserver=new IntersectionObserver(entries=>{
@@ -88,7 +88,7 @@
     }
   },{root:$('panel'),rootMargin:'100px'});
   const releaseThumbnails=()=>{thumbnailObserver.disconnect();$('grid').replaceChildren();$('preview').removeAttribute('src')};
-  host._dispose=()=>{events.abort();stopScrollGlass();releaseThumbnails()};
+  host._dispose=()=>{events.abort();clearTimeout(revealTimer);stopScrollGlass();releaseThumbnails()};
   const glassKey='codex-wallpaper-bridge:message-glass';
   try{$('glass').value=localStorage.getItem(glassKey)==='light'?'light':'solid'}catch{$('glass').value='solid'}
   const blurKey='codex-wallpaper-bridge:glass-blur';
@@ -97,8 +97,8 @@
   $('blur').value=String(savedBlur);
   const applyBlur=()=>{const value=Number($('blur').value);document.documentElement.style.setProperty('--wallpaper-glass-blur',value+'px');$('blur-value').textContent=String(value);$('blur').setAttribute('aria-valuetext',value===0?'无模糊':value+' 像素')};
   applyBlur();
-  $('blur').oninput=applyBlur;
-  $('blur').onchange=()=>{applyBlur();try{localStorage.setItem(blurKey,$('blur').value)}catch{$('status').textContent='模糊程度已生效，但保存失败；重启后需重新选择。'}};
+
+  $('blur').oninput=$('blur').onchange=()=>{applyBlur();try{localStorage.setItem(blurKey,$('blur').value)}catch{$('status').textContent='模糊程度已生效，但保存失败；重启后需重新选择。'}};
   const applyGlass=()=>{document.documentElement.setAttribute('data-wallpaper-glass',$('glass').value);$('blur-row').hidden=$('glass').value!=='light'};
   applyGlass();
   $('glass').onchange=()=>{applyGlass();try{localStorage.setItem(glassKey,$('glass').value)}catch{$('status').textContent='当前效果已生效，但保存失败；重启后需重新选择。'}};
@@ -107,7 +107,8 @@
   function controls(){
     $('apply').disabled=busy||!selected?.supported;
     $('retake').disabled=busy||!selected?.supported||selected.type==='image';
-    for(const id of ['opacity','restore','reveal','choose-library','official-font'])$(id).disabled=busy;
+    for(const id of ['restore','choose-library','official-font'])$(id).disabled=busy;
+    $('reveal').disabled=busy&&busyOp!=='opacity';
     for(const card of $('grid').querySelectorAll('.card')){card.disabled=busy||card.dataset.supported!=='true';card.classList.toggle('selected',card.dataset.id===selected?.id)}
   }
   function preview(){
@@ -147,10 +148,12 @@
   $('reveal').oninput=()=>{
     $('percent').textContent=$('reveal').value+'%';
     window.__CODEX_DREAM_SKIN_STATE__?.setWallpaperReveal?.(Number($('reveal').value)/100);
+    pendingReveal=Number($('reveal').value);clearTimeout(revealTimer);revealTimer=setTimeout(saveReveal,500);
   };
-  $('reveal').onchange=()=>mutate('opacity');
-  function mutate(op,extra={}){if(busy)return;busy=true;$('status').textContent='正在处理…';controls();request(op,{...extra,reveal:Number($('reveal').value)})}
-  $('apply').onclick=()=>{if(selected?.supported)mutate('apply',{id:selected.id})};$('opacity').onclick=()=>mutate('opacity');$('restore').onclick=()=>mutate('restore');
+  function saveReveal(){clearTimeout(revealTimer);if(busy||pendingReveal===null)return;pendingReveal=null;mutate('opacity')}
+  $('reveal').onchange=()=>{pendingReveal=Number($('reveal').value);saveReveal()};
+  function mutate(op,extra={}){if(busy)return;clearTimeout(revealTimer);pendingReveal=null;busy=true;busyOp=op;$('status').textContent='正在处理…';controls();request(op,{...extra,reveal:Number($('reveal').value)})}
+  $('apply').onclick=()=>{if(selected?.supported)mutate('apply',{id:selected.id})};$('restore').onclick=()=>mutate('restore');
   $('choose-library').onclick=()=>mutate('choose-library');
   $('official-font').onclick=()=>mutate('official-font');
   $('retake').onclick=()=>{if(selected?.supported)mutate('apply',{id:selected.id,retake:true})};
@@ -160,7 +163,7 @@
     if(result.items&&(!result.libraryInfo?.revision||result.libraryInfo.revision!==revision)){revision=result.libraryInfo?.revision;items=result.items;if(selected)selected=items.find(x=>x.id===selected.id)||null;preview();render();controls()}
     // A refresh response can arrive after Apply starts. It updates the list,
     // but must not complete the unrelated mutation or replace its progress.
-    if(result.message&&!((result.catalog||result.items)&&busy)){$('status').textContent=result.message;busy=false;controls()}
+    if(result.message&&!((result.catalog||result.items)&&busy)){$('status').textContent=result.message;busy=false;busyOp=null;controls();if(pendingReveal!==null){window.__CODEX_DREAM_SKIN_STATE__?.setWallpaperReveal?.(pendingReveal/100);saveReveal()}}
   };
   request('list',{revision});
 })
