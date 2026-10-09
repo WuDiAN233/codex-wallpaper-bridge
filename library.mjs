@@ -33,7 +33,7 @@ export async function findEngine(config,detected={}){
   }
   return null;
 }
-export async function scanLibrary(config,cache=null,detected=null){const system=detected??(config.autoDiscover?await systemPaths():{});const roots=await discoverRoots(config,system);return {...await catalog(roots,{native:!!config.nativeRendering,cache}),roots,enginePath:await findEngine(config,system)}}
+export async function scanLibrary(config,cache=null,detected=null){const system=detected??(config.autoDiscover?await systemPaths():{});const roots=await discoverRoots(config,system);return {...await catalog(roots,{native:!!config.nativeRendering,cache,inlinePreview:false}),roots,enginePath:await findEngine(config,system)}}
 export class LibraryMonitor{
   constructor(scan,onChange,intervalMs=5000){this.scan=scan;this.onChange=onChange;this.intervalMs=intervalMs;this.current=null;this.signature='';this.pending=null;this.nextScan=0}
   async refresh(force=false){

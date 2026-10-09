@@ -4,7 +4,7 @@
 
 ## 下载和启动
 
-1. 从 [Releases](https://github.com/WuDiAN233/codex-wallpaper-bridge/releases) 下载 `CodexWallpaperBridge-v0.2.4-windows.zip`，解压到你有写入权限的固定目录。支持中文、空格和不同盘符。
+1. 从 [Releases](https://github.com/WuDiAN233/codex-wallpaper-bridge/releases) 下载 `CodexWallpaperBridge-v0.2.5-windows.zip`，解压到你有写入权限的固定目录。支持中文、空格和不同盘符。
 2. 首次安装前关闭 Codex，双击 `Setup.cmd`。缺少基础组件时，会下载并校验 [Codex Dynamic Skin v1.6.2](https://github.com/CCDawn/Codex-Dynamic-Skin/releases/tag/v1.6.2) 的原版安装程序，然后显示安装向导；安装位置由你选择。
 3. 启动 Wallpaper Engine，再通过桌面的 **Codex Wallpaper Bridge** 快捷方式或 `Start-Picker.cmd` 打开 Codex。
 4. 点击右下角 **壁纸**。正常安装的 Steam / Wallpaper Engine 会被自动发现；未识别时点击 **选择图库目录**。
@@ -39,6 +39,8 @@
 首次高清取景会同步准备主题处理程序，取到图片后关闭取景窗口与应用图片同时进行；只有图片加载和窗口关闭均确认后才报告成功。面板显示当前处理阶段，最近一次耗时记录在本机 last-switch.json。不会使用低清预览图替代高清取景。
 
 本机同一场景重新取景样本从约 9.0 秒降至 6.9 秒，缓存应用约 3.7 秒；这是单机样本，首次取景仍取决于场景加载和设备性能，并非所有壁纸都能达到该速度。
+
+图库扫描只缓存项目元数据，不再同时缓存原始预览和缩略图。面板只为可视范围附近的卡片挂载图片，滚远、关闭或重装面板时释放图片元素及观察器；高清壁纸和消息框效果不变。本机 71 项图库的重复预览缓存减少 993,784 字节，滚动后的挂载缩略图从 71 张降为 18 张。浏览器图片缓存及整个 Codex 的内存由运行环境管理，以上不等于整应用内存降幅。
 
 ## 兼容范围
 

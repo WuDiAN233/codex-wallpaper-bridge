@@ -16,7 +16,7 @@ export async function safeFile(root, relative, scanStats=null) {
   if (!stat.isFile()) throw new Error('Wallpaper file is missing');
   return absolute;
 }
-export async function catalog(roots,{native=false,cache=null}={}) {
+export async function catalog(roots,{native=false,cache=null,inlinePreview=true}={}) {
   cache?.begin();
   // Share ancestor checks only within this single scan, never across polls.
   // Apply revalidates its selected file independently immediately before use.
@@ -57,7 +57,7 @@ export async function catalog(roots,{native=false,cache=null}={}) {
             const mime = {'.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp','.gif':'image/gif'}[path.extname(previewFileLocal).toLowerCase()];
             const previewStat=scanStats.get(previewFileLocal);
             if(mime&&previewStat.size<=12*1024*1024){previewFile=candidate;previewStamp=[previewStat.size,previewStat.mtimeMs,previewStat.ctimeMs].join(':')}
-            if (mime && previewStat.size <= 128*1024) preview = `data:${mime};base64,${cache?await cache.read(candidate,previewStat,'base64'):(await fs.readFile(candidate)).toString('base64')}`;
+            if (inlinePreview && mime && previewStat.size <= 128*1024) preview = `data:${mime};base64,${cache?await cache.read(candidate,previewStat,'base64'):(await fs.readFile(candidate)).toString('base64')}`;
           } catch { /* Optional thumbnail: the item remains visible without it. */ }
         }
         items.push({id:createHash('sha256').update(directory.toLowerCase()).digest('hex').slice(0,24),

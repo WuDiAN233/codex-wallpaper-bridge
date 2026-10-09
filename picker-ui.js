@@ -1,12 +1,12 @@
 (function installPicker(token,bridgePid) {
   const existing=document.getElementById('codex-wallpaper-picker');
-  if(existing?._bridgeToken===token&&existing?._uiVersion===14) return;
+  if(existing?._bridgeToken===token&&existing?._uiVersion===15) return;
   existing?._dispose?.();
   existing?.remove();
   const host=document.createElement('div'); host.id='codex-wallpaper-picker';
   host._bridgeToken=token;
   host._bridgePid=bridgePid;
-  host._uiVersion=14;
+  host._uiVersion=15;
   const events=new AbortController();host._dispose=()=>events.abort();
   host.style.cssText='position:fixed;right:20px;bottom:94px;z-index:2147483000;font-family:inherit;';
   const shadow=host.attachShadow({mode:'open'});
@@ -53,6 +53,17 @@
     ){background:rgb(var(--ds-panel-rgb) / .84)!important;backdrop-filter:blur(6px)!important;-webkit-backdrop-filter:blur(6px)!important}
   `;
   const $=id=>shadow.getElementById(id); let items=[],selected=null,busy=false,revision=null;
+  // Decode only the visible portion of the library. Unobserve before removing
+  // cards so observers never retain a previous search result or closed panel.
+  const thumbnailObserver=new IntersectionObserver(entries=>{
+    for(const {target,isIntersecting} of entries){
+      if(!target.isConnected||$('panel').hidden)continue;
+      if(isIntersecting)target.src=target.dataset.preview;
+      else target.removeAttribute('src');
+    }
+  },{root:$('panel'),rootMargin:'100px'});
+  const releaseThumbnails=()=>{thumbnailObserver.disconnect();$('grid').replaceChildren();$('preview').removeAttribute('src')};
+  host._dispose=()=>{events.abort();releaseThumbnails()};
   const glassKey='codex-wallpaper-bridge:message-glass';
   try{$('glass').value=localStorage.getItem(glassKey)==='light'?'light':'solid'}catch{$('glass').value='solid'}
   const applyGlass=()=>document.documentElement.setAttribute('data-wallpaper-glass',$('glass').value);
@@ -77,20 +88,20 @@
     const query=$('search').value.toLocaleLowerCase(),filter=$('filter').value;
     const visible=items.filter(x=>(filter==='all'||filter==='supported'&&x.supported||x.type===filter)&&x.name.toLocaleLowerCase().includes(query));
     $('count').textContent=`${visible.length} 个项目 · ${items.filter(x=>x.supported).length} 个可用`;
-    $('grid').replaceChildren();
+    releaseThumbnails();
     const fragment=document.createDocumentFragment();
     for(const item of visible){const card=document.createElement('button');card.className='card'+(selected?.id===item.id?' selected':'');card.disabled=!item.supported||busy;card.title=item.reason||item.name;card.dataset.id=item.id;card.dataset.supported=String(item.supported);
       const typeName={scene:'场景静帧',web:'网页壁纸',video:'视频',image:'图片',application:'应用程序'}[item.type]||'其他';
-      if(item.preview){const img=document.createElement('img');img.loading='lazy';img.decoding='async';img.src=item.preview;img.alt='';card.append(img)}else{const empty=document.createElement('div');empty.className='placeholder';empty.textContent=typeName;card.append(empty)}
+      if(item.preview){const img=document.createElement('img');img.decoding='async';img.dataset.preview=item.preview;img.alt='';card.append(img);thumbnailObserver.observe(img)}else{const empty=document.createElement('div');empty.className='placeholder';empty.textContent=typeName;card.append(empty)}
       const name=document.createElement('span');name.className='name';name.textContent=item.name;const kind=document.createElement('span');kind.className='kind';kind.textContent=item.supported?(item.type==='image'?'静态图片':typeName+' · 高清静帧'):item.reason;card.append(name,kind);
       card.onclick=()=>{selected=item;preview();controls()};fragment.append(card);
     }
     $('grid').append(fragment);preview();controls();
     if(!visible.length){const message=document.createElement('p');message.className='sub';message.textContent='没有符合条件的壁纸。新壁纸下载完成后会自动出现在这里。';$('grid').append(message)}
   }
-  const close=()=>{$('panel').hidden=true;$('grid').replaceChildren();$('preview').removeAttribute('src')};$('toggle').onclick=()=>{if(!$('panel').hidden){close();return}$('panel').hidden=false;render();request('list',{revision})};$('dismiss').onclick=close;
+  const close=()=>{$('panel').hidden=true;releaseThumbnails()};$('toggle').onclick=()=>{if(!$('panel').hidden){close();return}$('panel').hidden=false;render();request('list',{revision})};$('dismiss').onclick=close;
   document.addEventListener('pointerdown',event=>{
-    if(!host.isConnected){events.abort();return}
+    if(!host.isConnected){host._dispose();return}
     if(!$('panel').hidden&&!event.composedPath().includes(host))close();
   },{capture:true,signal:events.signal});
   // Codex may consume Escape keydown in its window capture handler.

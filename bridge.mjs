@@ -247,7 +247,7 @@ async function attach(){
     lastStatus=signature;lastStatusAt=Date.now();
   }
 }
-async function stop(){if(closed)return;closed=true;for(const session of sessions.values()){await session.evaluate(clearNativeExpression+`;document.getElementById('codex-wallpaper-picker')?.remove()`).catch(()=>{});session.ws.close()}try{await nativeRenderer.close(nativeRenderer.record)}catch(e){console.error('场景窗口关闭失败：'+e.message)}if((await fs.readFile(pidPath,'utf8').catch(()=>''))===String(process.pid))await fs.unlink(pidPath);process.exit(0)}
+async function stop(){if(closed)return;closed=true;for(const session of sessions.values()){await session.evaluate(clearNativeExpression+`;document.getElementById('codex-wallpaper-picker')?._dispose?.();document.getElementById('codex-wallpaper-picker')?.remove()`).catch(()=>{});session.ws.close()}try{await nativeRenderer.close(nativeRenderer.record)}catch(e){console.error('场景窗口关闭失败：'+e.message)}if((await fs.readFile(pidPath,'utf8').catch(()=>''))===String(process.pid))await fs.unlink(pidPath);process.exit(0)}
 process.on('SIGINT',stop);process.on('SIGTERM',stop);
 try {while(!closed){await attach();await new Promise(resolve=>setTimeout(resolve,3000))}}
 catch(e){await fs.writeFile(path.join(here,'status.json'),JSON.stringify({phase:'Stopped',reason:e.message,updatedAt:new Date().toISOString()},null,2));console.error(e.message);await stop()}

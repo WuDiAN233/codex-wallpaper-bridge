@@ -9,11 +9,11 @@ async function fixture(fn){const parent=await fs.realpath(os.tmpdir());const roo
 test('unchanged library reads no metadata or preview contents again',()=>fixture(async root=>{
  const dir=path.join(root,'project');await fs.mkdir(dir);
  await fs.writeFile(path.join(dir,'project.json'),JSON.stringify({title:'first',type:'image',file:'image.png',preview:'image.png'}));await fs.writeFile(path.join(dir,'image.png'),'fixture');
- const cache=new FileCache();const config={roots:[root]};const first=await scanLibrary(config,cache);assert.equal(cache.reads,2);
- const second=await scanLibrary(config,cache);assert.equal(cache.reads,2);assert.equal(cache.hits,2);assert.deepEqual(second,first);assert.equal(librarySignature(first),librarySignature(second));
+ const cache=new FileCache();const config={roots:[root]};const first=await scanLibrary(config,cache);assert.equal(cache.reads,1);
+ const second=await scanLibrary(config,cache);assert.equal(cache.reads,1);assert.equal(cache.hits,1);assert.deepEqual(second,first);assert.equal(librarySignature(first),librarySignature(second));
  await fs.writeFile(path.join(dir,'project.json'),JSON.stringify({title:'renamed wallpaper',type:'image',file:'image.png',preview:'image.png'}));
  await fs.writeFile(path.join(dir,'image.png'),'new fixture pixels');
- const changed=await scanLibrary(config,cache);assert.equal(changed.items[0].name,'renamed wallpaper');assert.notEqual(changed.items[0].preview,first.items[0].preview);assert.notEqual(librarySignature(first),librarySignature(changed));
+ const changed=await scanLibrary(config,cache);assert.equal(changed.items[0].name,'renamed wallpaper');assert.notEqual(changed.items[0].previewStamp,first.items[0].previewStamp);assert.notEqual(librarySignature(first),librarySignature(changed));
  await fs.unlink(path.join(dir,'project.json'));const removed=await scanLibrary(config,cache);assert.equal(removed.items.length,0);assert.equal(cache.entries.size,0);assert.equal(cache.bytes,0);
 }));
 test('preview cache stays bounded and oversized entries remain readable',()=>fixture(async root=>{
