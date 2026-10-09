@@ -1,12 +1,12 @@
 (function installPicker(token,bridgePid) {
   const existing=document.getElementById('codex-wallpaper-picker');
-  if(existing?._bridgeToken===token&&existing?._uiVersion===7) return;
+  if(existing?._bridgeToken===token&&existing?._uiVersion===8) return;
   existing?._dispose?.();
   existing?.remove();
   const host=document.createElement('div'); host.id='codex-wallpaper-picker';
   host._bridgeToken=token;
   host._bridgePid=bridgePid;
-  host._uiVersion=7;
+  host._uiVersion=8;
   const events=new AbortController();host._dispose=()=>events.abort();
   host.style.cssText='position:fixed;right:20px;bottom:94px;z-index:2147483000;font-family:inherit;';
   const shadow=host.attachShadow({mode:'open'});
@@ -20,10 +20,10 @@
   #reveal{accent-color:var(--ds-accent,#339cff)}
   </style><button id="toggle" title="从 Wallpaper Engine 本地库选择背景">壁纸</button>
   <section id="panel" hidden role="dialog" aria-label="Codex 壁纸"><div class="row"><strong>壁纸</strong><span class="grow"></span><button id="refresh">刷新图库</button><button id="dismiss" aria-label="关闭">×</button></div>
-  <div class="sub">自动识别 Wallpaper Engine 图库与新增壁纸，主题色跟随画面。场景壁纸保持实时动态；不兼容的项目会标明原因。</div>
-  <div class="row" style="margin-top:16px"><input class="grow" id="search" type="search" placeholder="搜索壁纸" aria-label="搜索壁纸"><select id="filter" aria-label="壁纸类型"><option value="all">全部壁纸</option><option value="supported">可用壁纸</option><option value="scene">场景动态</option><option value="web">网页壁纸</option><option value="video">视频</option><option value="image">图片</option></select></div>
+  <div class="sub">自动识别 Wallpaper Engine 图库与新增壁纸，主题色跟随画面。所有壁纸应用为静态图片；场景和视频仅在选择时取景，完成后停止后台渲染。</div>
+  <div class="row" style="margin-top:16px"><input class="grow" id="search" type="search" placeholder="搜索壁纸" aria-label="搜索壁纸"><select id="filter" aria-label="壁纸类型"><option value="all">全部壁纸</option><option value="supported">可用壁纸</option><option value="scene">场景静帧</option><option value="web">网页壁纸</option><option value="video">视频</option><option value="image">图片</option></select></div>
   <div class="row"><div id="library-info" class="sub grow">正在检查图库…</div><button id="official-font">默认字体</button><button id="choose-library">选择图库目录</button></div><div id="count" class="sub"></div><div id="grid"></div><div id="selection" hidden><img id="preview" class="preview" alt="所选壁纸预览"><div id="selected-name" class="sub"></div></div>
-  <div class="footer"><div class="row"><label for="reveal">背景可见度</label><input id="reveal" type="range" min="0" max="100" value="65"><output id="percent">65%</output></div><div class="row"><button id="apply" disabled>应用壁纸</button><button id="opacity">调整当前背景</button><span class="grow"></span><button id="restore">恢复原生外观</button></div><div id="status" role="status"></div></div></section>`;
+  <div class="footer"><div class="row"><label for="reveal">背景可见度</label><input id="reveal" type="range" min="0" max="100" value="65"><output id="percent">65%</output></div><div class="row"><button id="apply" disabled>应用静态壁纸</button><button id="opacity">调整当前背景</button><span class="grow"></span><button id="restore">恢复原生外观</button></div><div id="status" role="status"></div></div></section>`;
   document.body.append(host);
   let brightness=document.getElementById('codex-wallpaper-brightness');
   if(!brightness){brightness=document.createElement('style');brightness.id='codex-wallpaper-brightness';document.head.append(brightness)}
@@ -64,9 +64,9 @@
     $('grid').replaceChildren();
     const fragment=document.createDocumentFragment();
     for(const item of visible){const card=document.createElement('button');card.className='card'+(selected?.id===item.id?' selected':'');card.disabled=!item.supported||busy;card.title=item.reason||item.name;card.dataset.id=item.id;card.dataset.supported=String(item.supported);
-      const typeName={scene:'场景动态',web:'网页壁纸',video:'视频',image:'图片',application:'应用程序'}[item.type]||'其他';
+      const typeName={scene:'场景静帧',web:'网页壁纸',video:'视频',image:'图片',application:'应用程序'}[item.type]||'其他';
       if(item.preview){const img=document.createElement('img');img.loading='lazy';img.decoding='async';img.src=item.preview;img.alt='';card.append(img)}else{const empty=document.createElement('div');empty.className='placeholder';empty.textContent=typeName;card.append(empty)}
-      const name=document.createElement('span');name.className='name';name.textContent=item.name;const kind=document.createElement('span');kind.className='kind';kind.textContent=item.supported?(item.mode==='native'?typeName+' · 实时渲染':item.type==='video'?'视频 · 静音循环':'图片'):item.reason;card.append(name,kind);
+      const name=document.createElement('span');name.className='name';name.textContent=item.name;const kind=document.createElement('span');kind.className='kind';kind.textContent=item.supported?(item.type==='image'?'静态图片':typeName+' · 高清静帧'):item.reason;card.append(name,kind);
       card.onclick=()=>{selected=item;preview();controls()};fragment.append(card);
     }
     $('grid').append(fragment);preview();controls();

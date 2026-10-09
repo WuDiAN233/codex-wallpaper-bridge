@@ -10,7 +10,7 @@ import {scanLibrary,LibraryMonitor,librarySignature} from './library.mjs';
 import {FileCache} from './file-cache.mjs';
 import {readConfig,addLocation,saveConfig} from './configuration.mjs';
 import {Thumbnails} from './thumbnails.mjs';
-import {NativeRenderer,prepareNativeExpression,commitNativeExpression,clearNativeExpression,discardNativeExpression} from './native-media.mjs';
+import {NativeRenderer,prepareNativeExpression,clearNativeExpression,discardNativeExpression} from './native-media.mjs';
 const here=path.dirname(fileURLToPath(import.meta.url));
 const stateRoot=path.join(process.env.LOCALAPPDATA,'CodexDreamSkin');
 const engine=path.join(stateRoot,'engine');
@@ -51,7 +51,9 @@ await fs.writeFile(pidPath,String(process.pid));
 const sessions=new Map();let changing=false,closed=false;
 const nativeRenderer=new NativeRenderer(here,library.enginePath,run,powershell);
 let nativeRecoveryError=null;
-try{await nativeRenderer.recover(library.items)}catch(e){nativeRecoveryError=e.message;console.error('场景恢复失败：'+e.message)}
+// Static mode never reopens a renderer during startup. Retain its identity only
+// so the owned window from an older dynamic version can be closed safely.
+try{await nativeRenderer.recover(library.items,{open:false});await nativeRenderer.clear()}catch(e){nativeRecoveryError=e.message;console.error('旧场景窗口清理失败：'+e.message)}
 const monitor=new LibraryMonitor(async()=>{const next=await scanLibrary(await readConfig(here),fileCache);await thumbnails.fill(next.items);return next},async next=>{
   library=next;
   nativeRenderer.enginePath=next.enginePath;
@@ -106,7 +108,6 @@ async function handle(session,event){
   if(request.op!=='restore'&&(!Number.isInteger(request.reveal)||request.reveal<0||request.reveal>100))throw new Error('背景可见度必须在 0–100% 之间');
   await identity();changing=true;
   let backup=null,nativeBefore=null,pendingNative=null,preparedNative=null,activeMediaPath=null,colors=null;
-  const previousNative=nativeRenderer.record;
   try {
     const args=['-NoProfile','-ExecutionPolicy','RemoteSigned','-File',path.join(here,'theme-action.ps1'),'-Action'];
     if(request.op==='apply'){
@@ -119,14 +120,17 @@ async function handle(session,event){
       backup=path.join(here,'history',Date.now()+'-'+randomBytes(4).toString('hex'));
       await fs.cp(path.join(stateRoot,'active-theme'),backup,{recursive:true,dereference:false});
       activeMediaPath=validated;
-      if(item.mode==='native'){
+      if(item.mode==='native'||item.type==='video'){
         pendingNative=await nativeRenderer.begin(item);
         preparedNative=await session.evaluate(prepareNativeExpression(pendingNative.id,pendingNative.handle));
         const frames=path.join(here,'native-frames');await fs.mkdir(frames,{recursive:true});
         activeMediaPath=path.join(frames,pendingNative.id+'.png');
-        if(!preparedNative.frame?.startsWith('data:image/png;base64,')||preparedNative.frame.length>2*1024*1024)throw new Error('Invalid rendered wallpaper frame');
+        if(!preparedNative.frame?.startsWith('data:image/png;base64,')||preparedNative.frame.length>32*1024*1024)throw new Error('Invalid rendered wallpaper frame');
         await fs.writeFile(activeMediaPath,Buffer.from(preparedNative.frame.split(',')[1],'base64'));
         colors=paletteFromPixels(preparedNative.pixels);
+        // Release capture and the temporary renderer before applying the image.
+        await session.evaluate(discardNativeExpression);
+        await nativeRenderer.close(pendingNative);pendingNative=null;
       }
       args.push('Apply','-MediaPath',activeMediaPath,'-Title',item.name,'-Reveal',String(request.reveal));
       if(colors)args.push('-PaletteJson',JSON.stringify(colors));
@@ -158,14 +162,8 @@ async function handle(session,event){
       const actual=nativeAfter.themes[variant].chromeTheme;
       if(actual.accent.toLowerCase()!==colors.accent||actual.surface.toLowerCase()!==colors.background||actual.ink.toLowerCase()!==colors.text)throw new Error('Codex 原生主题颜色尚未同步');
       await fs.writeFile(path.join(here,'native-appearance-current.json'),JSON.stringify({wallpaper:item.name,variant,accent:actual.accent,surface:actual.surface,ink:actual.ink,fonts:actual.fonts,updatedAt:new Date().toISOString()},null,2));
-      if(pendingNative){
-        await session.evaluate(commitNativeExpression(pendingNative.id));
-        await nativeRenderer.commit(pendingNative);
-        await nativeRenderer.close(previousNative);
-      }else{
-        for(const target of sessions.values())await target.evaluate(clearNativeExpression);
-        await nativeRenderer.clear();
-      }
+      for(const target of sessions.values())await target.evaluate(clearNativeExpression);
+      await nativeRenderer.clear();
       nativeRecoveryError=null;session.nativeFailure=null;
     }
     if(request.op==='restore'){
@@ -174,16 +172,12 @@ async function handle(session,event){
       const original=await fs.readFile(path.join(here,'native-appearance-original.json'),'utf8').catch(e=>{if(e.code==='ENOENT')return null;throw e});
       if(original)await session.evaluate(restoreAppearanceExpression(JSON.parse(original)));
     }
-    await reply(session,{message:request.op==='restore'?'已隐藏壁纸并恢复原生界面。':request.op==='opacity'?'背景可见度已更新。':'壁纸已应用，主题色已跟随壁纸调整。'});
+    await reply(session,{message:request.op==='restore'?'已隐藏壁纸并恢复原生界面。':request.op==='opacity'?'背景可见度已更新。':'壁纸已应用为静态图片，后台取景已停止，主题色已同步。'});
   } catch(e){
     if(pendingNative){
-      await session.evaluate(discardNativeExpression);
-      if(nativeRenderer.record?.id===pendingNative.id){
-        await session.evaluate(clearNativeExpression);
-        if(previousNative){await session.evaluate(prepareNativeExpression(previousNative.id,previousNative.handle));await session.evaluate(commitNativeExpression(previousNative.id));await nativeRenderer.commit(previousNative)}
-        else await nativeRenderer.clear();
-      }
-      await nativeRenderer.close(pendingNative);
+      const cleanup=await Promise.allSettled([session.evaluate(discardNativeExpression),nativeRenderer.close(pendingNative)]);
+      const failures=cleanup.filter(x=>x.status==='rejected').map(x=>x.reason.message);
+      if(failures.length)e.message+='；取景清理未确认：'+failures.join('；');
     }
     if(backup){
       try {await fs.cp(backup,path.join(stateRoot,'active-theme'),{recursive:true,force:true});await run(node,[path.join(engine,'scripts','injector.mjs'),'--port',String(state.port),'--browser-id',state.browserId,'--verify','--timeout-ms','25000','--theme-dir',path.join(stateRoot,'active-theme')]);}
@@ -204,15 +198,7 @@ async function attach(){
     if(!session){session=new Session(target);sessions.set(target.id,session);await session.send('Runtime.enable');await session.send('Runtime.addBinding',{name:'codexWallpaperAction'});}
     const page=await session.evaluate(`({valid:location.protocol==='app:' && !!document.querySelector('main,aside.app-shell-left-panel,[data-testid="composer"]'),installed:document.getElementById('codex-wallpaper-picker')?._bridgePid===${process.pid},native:{id:window.__CODEX_WALLPAPER_NATIVE__?.id,handle:window.__CODEX_WALLPAPER_NATIVE__?.handle,failed:window.__CODEX_WALLPAPER_NATIVE__?.failed===true}})`);
     if(page.valid){
-      if(!page.installed)await session.evaluate(uiExpression);
-      if(!changing&&target.url==='app://-/index.html'&&nativeRenderer.record){
-        const record=nativeRenderer.record;
-        const nativeState=page.native;
-        if((nativeState.id!==record.id||nativeState.handle!==record.handle||nativeState.failed)&&session.nativeFailure!==record.id){
-          try{await session.evaluate(prepareNativeExpression(record.id,record.handle));await session.evaluate(commitNativeExpression(record.id))}
-          catch(e){session.nativeFailure=record.id;console.error('动态场景连接失败：'+e.message);await reply(session,{message:'动态场景连接失败，请重新应用：'+e.message})}
-        }
-      }
+      if(!page.installed){await session.evaluate(clearNativeExpression);await session.evaluate(uiExpression)}
     }
   }
   const liveIds=new Set(targets.map(target=>target.id));

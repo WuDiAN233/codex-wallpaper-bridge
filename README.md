@@ -1,10 +1,10 @@
 # Codex Wallpaper Bridge
 
-在 Windows 的 Codex 桌面应用内浏览 Wallpaper Engine 图库，切换动态场景、视频和图片，并让界面配色跟随壁纸。
+在 Windows 的 Codex 桌面应用内浏览 Wallpaper Engine 图库，将场景、视频和图片应用为静态壁纸，并让界面配色跟随壁纸。
 
 ## 下载和启动
 
-1. 从 [Releases](https://github.com/WuDiAN233/codex-wallpaper-bridge/releases) 下载 `CodexWallpaperBridge-v0.1.1-windows.zip`，解压到你有写入权限的固定目录。支持中文、空格和不同盘符。
+1. 从 [Releases](https://github.com/WuDiAN233/codex-wallpaper-bridge/releases) 下载 `CodexWallpaperBridge-v0.2.0-windows.zip`，解压到你有写入权限的固定目录。支持中文、空格和不同盘符。
 2. 首次安装前关闭 Codex，双击 `Setup.cmd`。缺少基础组件时，会下载并校验 [Codex Dynamic Skin v1.6.2](https://github.com/CCDawn/Codex-Dynamic-Skin/releases/tag/v1.6.2) 的原版安装程序，然后显示安装向导；安装位置由你选择。
 3. 启动 Wallpaper Engine，再通过桌面的 **Codex Wallpaper Bridge** 快捷方式或 `Start-Picker.cmd` 打开 Codex。
 4. 点击右下角 **壁纸**。正常安装的 Steam / Wallpaper Engine 会被自动发现；未识别时点击 **选择图库目录**。
@@ -26,11 +26,11 @@
 - “默认字体”通过 Codex 的外观接口恢复官方默认界面字体，不替换代码字体。对话和输入框使用高对比底色，移除动态背景上重复绘制的毛玻璃效果；输入框外围的黑底和渐变已清除。
 - “恢复原生外观”隐藏壁纸并恢复首次接入前的原生颜色；备份保留在本机。
 
-场景/大视频由 Wallpaper Engine 在一个屏幕外的受管窗口中渲染，Codex 只采集该窗口，不录制整个桌面、不采集音频。后台窗口不能直接删除，否则动态场景会停止；切换普通视频或恢复外观时会关闭它。采集上限 1920×1080、15 fps；实际宽度随窗口采集区域变化，本机测得 1868×1080。相比旧版高清采集会增加画面资源开销，通过取消毛玻璃和限制帧率平衡清晰度与性能。
+场景和视频在应用时由 Wallpaper Engine 临时渲染一次，取最高 1920×1080 的 PNG 静帧，随后立即停止采集并关闭本扩展创建的取景窗口。普通图片直接使用原图。平时只显示静态图片，没有持续视频解码或场景采集；不会关闭用户自己的桌面壁纸。图库仍自动识别新增壁纸。不会录制整个桌面或采集音频。
 
 ## 兼容范围
 
-- Windows 10/11、已安装的 Codex 桌面应用和 Wallpaper Engine；动态场景需保持 Wallpaper Engine 运行。
+- Windows 10/11、已安装的 Codex 桌面应用和 Wallpaper Engine；场景和视频首次取景时需要 Wallpaper Engine。
 - 实机验证的 Codex 包版本：**26.1002.7124.0**。内部页面结构和外观接口可能随升级改变，其他 Codex 版本尚未验证。
 - 基础皮肤组件固定 **v1.6.2**，不会自动覆盖或降级未知版本。不修改官方 Codex 应用包、签名或权限。
 - 网页壁纸和独立程序壁纸目前只识别，不开放应用。缺失项目文件的目录会标为待完成。

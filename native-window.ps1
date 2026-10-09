@@ -33,12 +33,15 @@ function Get-OwnedWindow {
 }
 if($Action -eq 'Close'){
  if(Get-OwnedWindow){Start-Process -FilePath $EnginePath -ArgumentList ('-control closeWallpaper -location "'+$WindowName+'"') -WindowStyle Hidden -Wait}
+ $deadline=[DateTime]::UtcNow.AddSeconds(5)
+ while((Get-OwnedWindow) -and [DateTime]::UtcNow -lt $deadline){Start-Sleep -Milliseconds 100}
+ if(Get-OwnedWindow){throw 'Wallpaper render window did not close'}
  '{"closed":true}';exit
 }
 if($Action -eq 'Open'){
  if(-not (Test-Path -LiteralPath $ProjectPath -PathType Leaf)){throw 'Wallpaper project unavailable'}
  $running=Get-Process -Name ([IO.Path]::GetFileNameWithoutExtension($EnginePath)) -ErrorAction SilentlyContinue | Where-Object {$_.Path -ieq $EnginePath}
- if(-not $running){throw '请先启动 Wallpaper Engine，再应用动态场景。'}
+ if(-not $running){throw '请先启动 Wallpaper Engine，以便获取壁纸静帧。'}
  $x=[NativeWallpaperWindow]::GetSystemMetrics(76)-1500
  $y=[NativeWallpaperWindow]::GetSystemMetrics(77)-1000
  $arguments='-control openWallpaper -file "'+$ProjectPath+'" -playInWindow "'+$WindowName+'" -width 1920 -height 1080 -x '+$x+' -y '+$y+' -borderless true'

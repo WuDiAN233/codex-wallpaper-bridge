@@ -20,7 +20,7 @@ async function prepareNative(id,handle){
       const check=()=>{context.drawImage(video,0,0,40,24);const pixels=context.getImageData(0,0,40,24).data;let usable=false;for(let i=0;i<pixels.length;i+=4){const sum=Math.max(pixels[i],pixels[i+1],pixels[i+2])+Math.min(pixels[i],pixels[i+1],pixels[i+2]);if(pixels[i+3]>=128&&sum>=41&&sum<=479){usable=true;break}}if(usable){clearTimeout(timer);resolve()}else callback=video.requestVideoFrameCallback(check)};
       callback=video.requestVideoFrameCallback(check);video.play().catch(error=>{clearTimeout(timer);video.cancelVideoFrameCallback(callback);reject(error)});
     });
-    const canvas=document.createElement('canvas');canvas.width=320;canvas.height=180;const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.drawImage(video,0,0,320,180);
+    const canvas=document.createElement('canvas');canvas.width=video.videoWidth;canvas.height=video.videoHeight;const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.drawImage(video,0,0,canvas.width,canvas.height);
     const frame=canvas.toDataURL('image/png');canvas.width=40;canvas.height=24;ctx.drawImage(video,0,0,40,24);
     window.__CODEX_WALLPAPER_PENDING__={id,handle,video,dispose};
     return {frame,pixels:Array.from(ctx.getImageData(0,0,40,24).data),width:video.videoWidth,height:video.videoHeight};
@@ -70,9 +70,10 @@ export class NativeRenderer{
   async commit(record){const previous=this.record;const stage=this.recordFile+'.tmp';await fs.writeFile(stage,JSON.stringify(record,null,2));await fs.rename(stage,this.recordFile);this.record=record;return previous}
   async close(record){if(record)await this.command('Close',record)}
   async clear(){const previous=this.record;await this.close(previous);await fs.unlink(this.recordFile).catch(e=>{if(e.code!=='ENOENT')throw e});this.record=null}
-  async recover(items){
+  async recover(items,{open=true}={}){
     let record;try{record=JSON.parse(await fs.readFile(this.recordFile,'utf8'))}catch(e){if(e.code==='ENOENT')return null;throw e}
     if(!/^[a-f0-9]{24}$/.test(record.id)||record.windowName!=='CodexWallpaper-'+record.id)throw new Error('Invalid saved wallpaper renderer identity');
+    if(!open){this.record=record;return record}
     const item=items.find(x=>x.id===record.itemId&&x.mode==='native');if(!item)throw new Error('原动态壁纸已移除或尚未下载完成，请重新选择。');
     record.project=item.project;
     Object.assign(record,await this.command('Open',record));this.record=record;return record;
