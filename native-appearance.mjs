@@ -1,4 +1,5 @@
 const moduleUrl='app://-/assets/register-app-actions-3683119912d7.js';
+export const restoreOfficialFontExpression=`(async()=>{const {appActionRegistry:r}=await import(${JSON.stringify(moduleUrl)});for(const variant of ['dark','light'])await r.get('app.appearance.set_theme')({type:'app.appearance.set_theme',variant,theme:{kind:'custom',patch:{fonts:{ui:null}}}},{});return r.get('app.appearance.get')({type:'app.appearance.get'},{})})()`;
 export const readAppearanceExpression=`(async()=>{const {appActionRegistry:r}=await import(${JSON.stringify(moduleUrl)});return r.get('app.appearance.get')({type:'app.appearance.get'}, {})})()`;
 export function appearancePatch(colors){
   for(const key of ['accent','background','text'])if(!/^#[0-9a-fA-F]{6}$/.test(colors[key]||''))throw new Error('Invalid native theme color');

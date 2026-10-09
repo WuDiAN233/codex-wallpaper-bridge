@@ -8,7 +8,7 @@ async function prepareNative(id,handle){
   let stream,expired=false,timer;
   const dispose=()=>{expired=true;clearTimeout(timer);video.pause();stream?.getTracks().forEach(t=>t.stop());video.srcObject=null;video.remove()};
   try{
-    const request=navigator.mediaDevices.getUserMedia({audio:false,video:{mandatory:{chromeMediaSource:'desktop',chromeMediaSourceId:`window:${handle}:0`,maxWidth:960,maxHeight:540,maxFrameRate:15}}});
+    const request=navigator.mediaDevices.getUserMedia({audio:false,video:{mandatory:{chromeMediaSource:'desktop',chromeMediaSourceId:`window:${handle}:0`,maxWidth:1920,maxHeight:1080,maxFrameRate:15}}});
     request.then(s=>{if(expired)s.getTracks().forEach(t=>t.stop())},()=>{});
     stream=await Promise.race([request,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('动态场景连接超时')),8000)})]);
     clearTimeout(timer);video.srcObject=stream;

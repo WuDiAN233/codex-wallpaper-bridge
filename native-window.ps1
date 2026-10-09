@@ -41,7 +41,7 @@ if($Action -eq 'Open'){
  if(-not $running){throw '请先启动 Wallpaper Engine，再应用动态场景。'}
  $x=[NativeWallpaperWindow]::GetSystemMetrics(76)-1500
  $y=[NativeWallpaperWindow]::GetSystemMetrics(77)-1000
- $arguments='-control openWallpaper -file "'+$ProjectPath+'" -playInWindow "'+$WindowName+'" -width 960 -height 540 -x '+$x+' -y '+$y+' -borderless true'
+ $arguments='-control openWallpaper -file "'+$ProjectPath+'" -playInWindow "'+$WindowName+'" -width 1920 -height 1080 -x '+$x+' -y '+$y+' -borderless true'
  Start-Process -FilePath $EnginePath -ArgumentList $arguments -WindowStyle Hidden -Wait
  $deadline=[DateTime]::UtcNow.AddSeconds(15)
  do {$window=Get-OwnedWindow;if($window){break};Start-Sleep -Milliseconds 100}while([DateTime]::UtcNow -lt $deadline)

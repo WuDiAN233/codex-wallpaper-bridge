@@ -4,7 +4,7 @@
 
 ## 下载和启动
 
-1. 从 [Releases](https://github.com/WuDiAN233/codex-wallpaper-bridge/releases) 下载 `CodexWallpaperBridge-v0.1.0-windows.zip`，解压到你有写入权限的固定目录。支持中文、空格和不同盘符。
+1. 从 [Releases](https://github.com/WuDiAN233/codex-wallpaper-bridge/releases) 下载 `CodexWallpaperBridge-v0.1.1-windows.zip`，解压到你有写入权限的固定目录。支持中文、空格和不同盘符。
 2. 首次安装前关闭 Codex，双击 `Setup.cmd`。缺少基础组件时，会下载并校验 [Codex Dynamic Skin v1.6.2](https://github.com/CCDawn/Codex-Dynamic-Skin/releases/tag/v1.6.2) 的原版安装程序，然后显示安装向导；安装位置由你选择。
 3. 启动 Wallpaper Engine，再通过桌面的 **Codex Wallpaper Bridge** 快捷方式或 `Start-Picker.cmd` 打开 Codex。
 4. 点击右下角 **壁纸**。正常安装的 Steam / Wallpaper Engine 会被自动发现；未识别时点击 **选择图库目录**。
@@ -23,9 +23,10 @@
 - 拖动“背景可见度”会立即预览，松手自动保存。100% 会去掉对话区的背景暗色遮罩，消息和输入框仍保留自己的背景。
 - 点击面板外或按 Esc 收起；关闭面板会释放缩略图元素。
 - 预览图在本机转换为静态小缩略图，不上传图片或壁纸。暂时没有可用预览的项目显示类型文字。
+- “默认字体”通过 Codex 的外观接口恢复官方默认界面字体，不替换代码字体。对话和输入框使用高对比底色，移除动态背景上重复绘制的毛玻璃效果；输入框外围的黑底和渐变已清除。
 - “恢复原生外观”隐藏壁纸并恢复首次接入前的原生颜色；备份保留在本机。
 
-场景/大视频由 Wallpaper Engine 在一个屏幕外的受管窗口中渲染，Codex 只采集该窗口，不录制整个桌面、不采集音频。后台窗口不能直接删除，否则动态场景会停止；切换普通视频或恢复外观时会关闭它。采集上限 960×540、15 fps，偏重资源节省，放大细节清晰度有限。
+场景/大视频由 Wallpaper Engine 在一个屏幕外的受管窗口中渲染，Codex 只采集该窗口，不录制整个桌面、不采集音频。后台窗口不能直接删除，否则动态场景会停止；切换普通视频或恢复外观时会关闭它。采集上限 1920×1080、15 fps；实际宽度随窗口采集区域变化，本机测得 1868×1080。相比旧版高清采集会增加画面资源开销，通过取消毛玻璃和限制帧率平衡清晰度与性能。
 
 ## 兼容范围
 

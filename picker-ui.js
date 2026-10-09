@@ -1,12 +1,12 @@
 (function installPicker(token,bridgePid) {
   const existing=document.getElementById('codex-wallpaper-picker');
-  if(existing?._bridgeToken===token&&existing?._uiVersion===4) return;
+  if(existing?._bridgeToken===token&&existing?._uiVersion===7) return;
   existing?._dispose?.();
   existing?.remove();
   const host=document.createElement('div'); host.id='codex-wallpaper-picker';
   host._bridgeToken=token;
   host._bridgePid=bridgePid;
-  host._uiVersion=4;
+  host._uiVersion=7;
   const events=new AbortController();host._dispose=()=>events.abort();
   host.style.cssText='position:fixed;right:20px;bottom:94px;z-index:2147483000;font-family:inherit;';
   const shadow=host.attachShadow({mode:'open'});
@@ -22,7 +22,7 @@
   <section id="panel" hidden role="dialog" aria-label="Codex 壁纸"><div class="row"><strong>壁纸</strong><span class="grow"></span><button id="refresh">刷新图库</button><button id="dismiss" aria-label="关闭">×</button></div>
   <div class="sub">自动识别 Wallpaper Engine 图库与新增壁纸，主题色跟随画面。场景壁纸保持实时动态；不兼容的项目会标明原因。</div>
   <div class="row" style="margin-top:16px"><input class="grow" id="search" type="search" placeholder="搜索壁纸" aria-label="搜索壁纸"><select id="filter" aria-label="壁纸类型"><option value="all">全部壁纸</option><option value="supported">可用壁纸</option><option value="scene">场景动态</option><option value="web">网页壁纸</option><option value="video">视频</option><option value="image">图片</option></select></div>
-  <div class="row"><div id="library-info" class="sub grow">正在检查图库…</div><button id="choose-library">选择图库目录</button></div><div id="count" class="sub"></div><div id="grid"></div><div id="selection" hidden><img id="preview" class="preview" alt="所选壁纸预览"><div id="selected-name" class="sub"></div></div>
+  <div class="row"><div id="library-info" class="sub grow">正在检查图库…</div><button id="official-font">默认字体</button><button id="choose-library">选择图库目录</button></div><div id="count" class="sub"></div><div id="grid"></div><div id="selection" hidden><img id="preview" class="preview" alt="所选壁纸预览"><div id="selected-name" class="sub"></div></div>
   <div class="footer"><div class="row"><label for="reveal">背景可见度</label><input id="reveal" type="range" min="0" max="100" value="65"><output id="percent">65%</output></div><div class="row"><button id="apply" disabled>应用壁纸</button><button id="opacity">调整当前背景</button><span class="grow"></span><button id="restore">恢复原生外观</button></div><div id="status" role="status"></div></div></section>`;
   document.body.append(host);
   let brightness=document.getElementById('codex-wallpaper-brightness');
@@ -33,12 +33,21 @@
     html[data-dream-skin="active"]:has(#codex-wallpaper-picker) main[class*="_MainContentSurface_"]::after{opacity:calc(1 - var(--dream-wallpaper-reveal,1))!important}
     html[data-dream-skin="active"]:has(#codex-wallpaper-picker) aside.app-shell-left-panel{background:rgb(var(--ds-panel-rgb) / calc(.1 + (1 - var(--dream-wallpaper-reveal,1)) * .8))!important}
     html[data-dream-skin="active"][data-native-wallpaper="active"]:has(#codex-wallpaper-picker) body{background-color:transparent!important}
+    html[data-dream-skin="active"]:has(#codex-wallpaper-picker) main [class~="pointer-events-none"][class~="absolute"][class~="inset-x-0"][class~="bottom-0"][class~="bg-surface"]{background:transparent!important}
+    html[data-dream-skin="active"]:has(#codex-wallpaper-picker) main [class~="pointer-events-none"][class~="absolute"][class~="inset-x-0"][class~="h-8"][class~="bg-gradient-to-t"][class~="from-surface"]{background:transparent!important}
+    html[data-dream-skin="active"]:has(#codex-wallpaper-picker) :is(.thread-scroll-container,.thread-scroll-container *,aside.app-shell-left-panel,.composer-surface-chrome,[data-composer-surface-variant]){backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+    html[data-dream-skin="active"]:has(#codex-wallpaper-picker) .thread-scroll-container :is([data-response-annotation-conversation][data-response-annotation-target],[data-local-conversation-item-target-ids],[data-local-conversation-final-assistant]){background:var(--ds-panel,#1b2733)!important;color:var(--ds-text,#f3f3f3)!important;box-shadow:none!important;border-color:var(--ds-line)!important}
+    html[data-dream-skin="active"]:has(#codex-wallpaper-picker) .thread-scroll-container [data-markdown-text-style]:not([data-response-annotation-conversation] *):not([data-local-conversation-final-assistant] *){background:var(--ds-panel,#1b2733)!important;color:var(--ds-text,#f3f3f3)!important;border-radius:12px;padding:12px 16px}
+    html[data-dream-skin="active"]:has(#codex-wallpaper-picker) .thread-scroll-container [data-local-conversation-final-assistant] [data-response-annotation-conversation]{background:transparent!important;border:0!important}
+    html[data-dream-skin="active"]:has(#codex-wallpaper-picker) .thread-scroll-container :is(p,li,td,th){text-shadow:none!important}
+    html[data-dream-skin="active"]:has(#codex-wallpaper-picker) [data-user-message-bubble]{background:var(--ds-panel-2,#233448)!important;color:var(--ds-text,#f3f3f3)!important;border:1px solid var(--ds-line)!important}
+    html[data-dream-skin="active"]:has(#codex-wallpaper-picker) :is(.composer-surface-chrome,[data-composer-surface-variant]){background:var(--ds-panel,#1b2733)!important;box-shadow:none!important}
   `;
   const $=id=>shadow.getElementById(id); let items=[],selected=null,busy=false,revision=null;
   const request=(op,extra={})=>window.codexWallpaperAction(JSON.stringify({token,op,...extra}));
   function controls(){
     $('apply').disabled=busy||!selected?.supported;
-    for(const id of ['opacity','restore','reveal','choose-library'])$(id).disabled=busy;
+    for(const id of ['opacity','restore','reveal','choose-library','official-font'])$(id).disabled=busy;
     for(const card of $('grid').querySelectorAll('.card')){card.disabled=busy||card.dataset.supported!=='true';card.classList.toggle('selected',card.dataset.id===selected?.id)}
   }
   function preview(){
@@ -82,6 +91,7 @@
   function mutate(op,extra={}){if(busy)return;busy=true;$('status').textContent='正在处理…';controls();request(op,{...extra,reveal:Number($('reveal').value)})}
   $('apply').onclick=()=>{if(selected?.supported)mutate('apply',{id:selected.id})};$('opacity').onclick=()=>mutate('opacity');$('restore').onclick=()=>mutate('restore');
   $('choose-library').onclick=()=>mutate('choose-library');
+  $('official-font').onclick=()=>mutate('official-font');
   host.update=function(result){
     if(result.libraryInfo){const info=result.libraryInfo;$('library-info').textContent=`自动同步中 · ${info.roots} 个图库来源${info.pending?' · '+info.pending+' 个目录等待下载完整或修复':''}`}
     if(result.items&&(!result.libraryInfo?.revision||result.libraryInfo.revision!==revision)){revision=result.libraryInfo?.revision;items=result.items;if(selected)selected=items.find(x=>x.id===selected.id)||null;preview();render();controls()}

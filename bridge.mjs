@@ -5,7 +5,7 @@ import {randomBytes} from 'node:crypto';
 import {spawn} from 'node:child_process';
 import {catalog,safeFile} from './catalog.mjs';
 import {paletteFromPixels,sampleWallpaperExpression} from './palette.mjs';
-import {readAppearanceExpression,applyAppearanceExpression,restoreAppearanceExpression} from './native-appearance.mjs';
+import {readAppearanceExpression,applyAppearanceExpression,restoreAppearanceExpression,restoreOfficialFontExpression} from './native-appearance.mjs';
 import {scanLibrary,LibraryMonitor,librarySignature} from './library.mjs';
 import {FileCache} from './file-cache.mjs';
 import {readConfig,addLocation,saveConfig} from './configuration.mjs';
@@ -75,7 +75,7 @@ function libraryInfo(){return {total:library.items.length,available:library.item
 async function handle(session,event){
   if(typeof event.payload!=='string'||event.payload.length>1024)return;
   let request;try{request=JSON.parse(event.payload)}catch{return}
-  if(request.token!==token||!['list','apply','opacity','restore','choose-library'].includes(request.op))return;
+  if(request.token!==token||!['list','apply','opacity','restore','choose-library','official-font'].includes(request.op))return;
   const allowed=new Set(['token','op','id','reveal']);if(Object.keys(request).some(key=>!allowed.has(key)))return;
   const probe=await session.evaluate(`location.protocol==='app:' && !!document.querySelector('main,aside.app-shell-left-panel,[data-testid="composer"]')`);if(!probe)throw new Error('当前页面不是 Codex 工作区');
   if(request.op==='list'){
@@ -84,6 +84,16 @@ async function handle(session,event){
     await monitor.refresh(true);return;
   }
   if(changing)throw new Error('上一项操作尚未结束，请稍候');
+  if(request.op==='official-font'){
+    changing=true;
+    try{
+      const before=await session.evaluate(readAppearanceExpression);
+      try{await fs.writeFile(path.join(here,'native-font-original.json'),JSON.stringify({dark:before.themes.dark.chromeTheme.fonts,light:before.themes.light.chromeTheme.fonts},null,2),{flag:'wx'})}catch(e){if(e.code!=='EEXIST')throw e}
+      const after=await session.evaluate(restoreOfficialFontExpression);
+      for(const variant of ['dark','light'])if(after.themes[variant].chromeTheme.fonts.ui!=null||after.themes[variant].chromeTheme.fonts.code!==before.themes[variant].chromeTheme.fonts.code)throw new Error('默认字体尚未确认。');
+      return reply(session,{message:'已恢复 Codex 默认界面字体，代码字体保持原设置。'});
+    }finally{changing=false}
+  }
   if(request.op==='choose-library'){
     changing=true;
     try{

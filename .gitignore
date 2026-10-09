@@ -6,6 +6,7 @@
 /status.json
 /active-native.json*
 /native-appearance-*.json
+/native-font-*.json
 /native-frames/
 /thumbnails/
 /history/
