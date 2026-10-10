@@ -6,10 +6,14 @@
 
 1. 从 [Releases](https://github.com/WuDiAN233/codex-wallpaper-bridge/releases) 下载 `CodexWallpaperBridge-v0.2.6-windows.zip`，解压到你有写入权限的固定目录。支持中文、空格和不同盘符。
 2. 首次安装前关闭 Codex，双击 `Setup.cmd`。缺少基础组件时，会下载并校验 [Codex Dynamic Skin v1.6.2](https://github.com/CCDawn/Codex-Dynamic-Skin/releases/tag/v1.6.2) 的原版安装程序，然后显示安装向导；安装位置由你选择。
-3. 启动 Wallpaper Engine，再通过桌面的 **Codex Wallpaper Bridge** 快捷方式或 `Start-Picker.cmd` 打开 Codex。
+3. 启动 Wallpaper Engine，再通过桌面的 **Codex（自动换肤）** 快捷方式或 `Start-Picker.cmd` 打开 Codex。
 4. 点击右下角 **壁纸**。正常安装的 Steam / Wallpaper Engine 会被自动发现；未识别时点击 **选择图库目录**。
 
 如果 Windows 提示下载的 PowerShell 脚本没有签名，请先在下载 ZIP 的属性中勾选“解除锁定”，重新解压后运行。不要关闭系统安全软件或修改全局执行策略。
+
+## 随 Codex 启动
+
+安装后桌面和开始菜单会增加 **Codex（自动换肤）**。该入口负责启动 Codex、皮肤和壁纸面板，不需要另外打开换肤工具。原生商店入口不会被劫持，仍可启动无皮肤窗口；如已打开原生窗口，请正常退出后再使用自动换肤入口。不会自动中断正在执行的任务。更新后由基础组件发现当前安装的 Codex 版本，实际渲染兼容性仍需验证。启动错误会显示提示并记录到本机 startup-error.log。
 
 ## 图库路径
 
